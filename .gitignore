@@ -12,7 +12,7 @@ __pycache__/
 
 # C extensions
 *.so
-
+*.dcm
 # Distribution / packaging
 .Python
 env/
