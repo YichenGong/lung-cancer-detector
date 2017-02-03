@@ -1,7 +1,7 @@
 import numpy as np
 import dicom
 import os
-import cv2
+# import cv2
 import tensorflow as tf
 
 
@@ -11,6 +11,7 @@ def get_3d_data_from_dicom(path):
   """
   slices = [dicom.read_file(path + '/' + s) for s in os.listdir(path)]
   slices.sort(key=lambda x: int(x.InstanceNumber))
+  print("loaded " + path)
   return np.stack([s.pixel_array for s in slices])
 
 
@@ -58,15 +59,25 @@ layer2_channels = 8
 
 num_hidden = 64
 
+
+
+def conv_layer:
+
+
+
+
 # Graph
 
 # graph = tf.Graph()
 # with graph.as_default():
-with tf.device('/gpu:0'):
+with tf.device('/cpu:0'):
   # Input data.
+
   tf_train_dataset = tf.placeholder(
     tf.float32, shape=(batch_size, in_depth, in_height, in_width, in_channels))
   tf_train_labels = tf.placeholder(tf.float32, shape=(batch_size, num_labels))
+
+
 
   # Variables.
   layer1_weights = tf.Variable(tf.truncated_normal(
@@ -125,6 +136,7 @@ with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as session:
   # test on one data point
   data = get_3d_data_from_dicom('../data/sample/images/0a0c32c9e08cc2ea76a71649de56be6d')
   train_data = preprocess(data, in_depth, in_height, in_width)
+  print("preprocessed")
   train_label = np.array([1])
 
   for step in range(num_steps):
