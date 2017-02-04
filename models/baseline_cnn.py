@@ -60,13 +60,13 @@ in_height = 128
 in_width = 128
 in_channels = 1
 
-filter_depth = 5
-filter_height = 5
-filter_width = 5
+filter_depth = 3
+filter_height = 3
+filter_width = 3
 conv_stride = [1, 1, 1, 1, 1]
 
-layer1_channels = 2
-layer2_channels = 2
+layer1_channels = 4
+layer2_channels = 16
 
 num_hidden = 64
 
@@ -74,7 +74,7 @@ num_hidden = 64
 
 # graph = tf.Graph()
 # with graph.as_default():
-with tf.device('/cpu:0'):
+with tf.device('/gpu:0'):
   # Input data.
 
   tf_train_dataset = tf.placeholder(
@@ -101,6 +101,10 @@ with tf.device('/cpu:0'):
 
   # Model.
   def model(data):
+    # normalize
+    max_v = tf.reduce_max(data)
+    data = tf.realdiv(data, max_v)
+
     conv1 = conv3d(data, layer1_weights, conv_stride)
     # conv1 = tf.Print(conv1, [tf.argmax(conv1, 1)], 'After conv1 = ')  # print something with tf.Print
     conv1 = tf.nn.relu(conv1 + layer1_biases)
@@ -121,19 +125,26 @@ with tf.device('/cpu:0'):
 
   # Training computation.
   logits = model(tf_train_dataset)
-  loss = tf.reduce_mean(
-    tf.nn.softmax_cross_entropy_with_logits(logits, tf_train_labels))
+  # Prediction
+  loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits, tf_train_labels))
 
   # Optimizer.
-  optimizer = tf.train.GradientDescentOptimizer(0.05).minimize(loss)
+  optimizer = tf.train.GradientDescentOptimizer(0.05)
+  grads = optimizer.compute_gradients(loss)
+  capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in grads]
+  train_op = optimizer.apply_gradients(capped_gvs)
 
   # Prediction
-  train_prediction = tf.nn.softmax(logits)
+  train_prediction = tf.sigmoid(logits)
 
-num_steps = 1
+num_steps = 100
 
 # with tf.Session(graph=graph) as session:
-with tf.Session(config=tf.ConfigProto(log_device_placement=False)) as session:
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+config.log_device_placement=False
+
+with tf.Session(config=config) as session:
   run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
   run_metadata = tf.RunMetadata()
 
@@ -147,15 +158,17 @@ with tf.Session(config=tf.ConfigProto(log_device_placement=False)) as session:
   data = [get_3d_data_from_dicom(path) for path in paths]
 
   train_data = np.array([preprocess(single_slice, in_depth, in_height, in_width) for single_slice in data])
-  train_label = np.array([[1], [1]])
+  train_label = np.array([[1], [0]])
 
   print('Preprocessed. Shape of training data: {0}'.format(train_data.shape))
 
   for step in range(num_steps):
     feed_dict = {tf_train_dataset: np.array(train_data), tf_train_labels: np.array(train_label)}
-    _, l, predictions = session.run([optimizer, loss, train_prediction],
+    _, l, predictions = session.run([train_op, loss, train_prediction],
                                     feed_dict=feed_dict, options=run_options, run_metadata=run_metadata)
 
+    print('Predicstions: %s ' % predictions.T)
+    print('Labels: %s' % train_label.T)
     print('Minibatch loss at step %d: %f' % (step, l))
 
     # Create the Timeline object, and write it to a json
