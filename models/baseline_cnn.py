@@ -115,12 +115,10 @@ with tf.device('/gpu:0'):
     data = tf.realdiv(data, max_v)
 
     conv1 = conv3d(data, layer1_weights, conv_stride)
-    # conv1 = tf.Print(conv1, [tf.argmax(conv1, 1)], 'After conv1 = ')  # print something with tf.Print
     conv1 = tf.nn.relu(conv1 + layer1_biases)
     pool1 = max_pool3d(conv1, 2)
 
     conv2 = conv3d(pool1, layer2_weights, conv_stride)
-    # conv2 = tf.Print(conv2, [tf.argmax(conv2, 1)], 'After conv2 = ')  # print something with tf.Print
     conv2 = tf.nn.relu(conv2 + layer2_biases)
     pool2 = max_pool3d(conv2, 2)
 
@@ -128,7 +126,6 @@ with tf.device('/gpu:0'):
     reshape = tf.reshape(pool2, [tf.shape(data)[0], shape[1] * shape[2] * shape[3] * shape[4]])
 
     hidden = tf.nn.relu(tf.matmul(reshape, layer3_weights) + layer3_biases)
-    # hidden = tf.Print(hidden, [tf.argmax(hidden, 1)], 'After hidden layer = ')  # print something with tf.Print
     return tf.matmul(hidden, layer4_weights) + layer4_biases
 
 
@@ -178,7 +175,6 @@ with tf.Session(config=config) as session:
 
     train_data = get_data_with_ids(data_folder_path, batch_ids)
     train_label = get_label_with_ids(label_file_path, batch_ids)
-#   print('Preprocessed. Shape of batch data: {0}'.format(train_data.shape))
 
     feed_dict = {tf_train_dataset: np.array(train_data), tf_train_labels: np.array(train_label)}
     _, l, predictions = session.run([train_op, loss, train_prediction],
@@ -186,8 +182,6 @@ with tf.Session(config=config) as session:
                                     options=run_options,
                                     run_metadata=run_metadata)
 
-    # print('Predicstions: %s ' % predictions.T)
-    # print('Labels: %s' % train_label.T)
     print('Minibatch loss at step %d: %f' % (step, l))
 
     # Create the Timeline object, and write it to a json
