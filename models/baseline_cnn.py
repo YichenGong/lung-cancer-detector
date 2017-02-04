@@ -3,12 +3,13 @@ import numpy as np
 import dicom
 import os
 import sys
-
-sys.path.append('/usr/local/lib/python2.7/site-packages')
 import cv2
 import tensorflow as tf
 from tensorflow.python.client import timeline
 import pandas as pd
+
+
+
 
 def get_data_with_ids(folder, patient_ids):
   data = [get_3d_data_from_dicom(folder + patient_id) for patient_id in patient_ids]
@@ -17,7 +18,8 @@ def get_data_with_ids(folder, patient_ids):
 def get_label_with_ids(label_path, patient_ids):
   label_file = pd.read_csv(label_path, index_col=0).T.to_dict()
   labels = {key: value['cancer'] for key, value in label_file.items()}
-  return np.array([labels[patient_id] for patient_id in patient_ids])
+  label_array =  np.array([labels[patient_id] for patient_id in patient_ids])
+  return np.expand_dims(label_array, axis=len(label_array.shape))
 
 def get_3d_data_from_dicom(path):
   """
@@ -25,7 +27,6 @@ def get_3d_data_from_dicom(path):
   """
   slices = [dicom.read_file(path + '/' + s) for s in os.listdir(path)]
   slices.sort(key=lambda x: int(x.InstanceNumber))
-  print("loaded " + path)
   return np.stack([s.pixel_array for s in slices])
 
 def preprocess(scan, depth, height, width):
@@ -60,10 +61,10 @@ def max_pool3d(input_data, depth_stride):
 
 
 # Parameters
-batch_size = 4
+batch_size = 20
 num_labels = 1
 
-in_depth = 120
+in_depth = 100
 in_height = 128
 in_width = 128
 in_channels = 1
@@ -73,8 +74,8 @@ filter_height = 3
 filter_width = 3
 conv_stride = [1, 1, 1, 1, 1]
 
-layer1_channels = 4
-layer2_channels = 16
+layer1_channels = 8
+layer2_channels = 32
 
 num_hidden = 64
 
@@ -86,8 +87,8 @@ with tf.device('/gpu:0'):
   # Input data.
 
   tf_train_dataset = tf.placeholder(
-    tf.float32, shape=(batch_size, in_depth, in_height, in_width, in_channels))
-  tf_train_labels = tf.placeholder(tf.float32, shape=(batch_size, num_labels))
+    tf.float32, [None, in_depth, in_height, in_width, in_channels])
+  tf_train_labels = tf.placeholder(tf.float32, [None, num_labels])
 
   # Variables.
   layer1_weights = tf.Variable(tf.truncated_normal(
@@ -124,7 +125,7 @@ with tf.device('/gpu:0'):
     pool2 = max_pool3d(conv2, 2)
 
     shape = pool2.get_shape().as_list()
-    reshape = tf.reshape(pool2, [shape[0], shape[1] * shape[2] * shape[3] * shape[4]])
+    reshape = tf.reshape(pool2, [tf.shape(data)[0], shape[1] * shape[2] * shape[3] * shape[4]])
 
     hidden = tf.nn.relu(tf.matmul(reshape, layer3_weights) + layer3_biases)
     # hidden = tf.Print(hidden, [tf.argmax(hidden, 1)], 'After hidden layer = ')  # print something with tf.Print
@@ -145,7 +146,7 @@ with tf.device('/gpu:0'):
   # Prediction
   train_prediction = tf.sigmoid(logits)
 
-num_steps = 10
+num_steps = 1000
 
 # with tf.Session(graph=graph) as session:
 config = tf.ConfigProto()
@@ -163,16 +164,21 @@ with tf.Session(config=config) as session:
   data_folder_path = '../data/sample/images/'
   label_file_path = '../data/stage1_labels.csv'
   ids = os.listdir(data_folder_path)
+  ids = [item for item in ids if not item.startswith(".")]
+  label_file = pd.read_csv(label_file_path, index_col=0).T.to_dict()
+  labels = {key: value['cancer'] for key, value in label_file.items()}
+  ids = [p_id for p_id in ids if p_id in labels.keys()]
   num_sample = len(ids)
+  print('Total Number of data points: %d' % (num_sample))
 
   offset = 0
   for step in range(num_steps):
     batch_ids = ids[offset: min(offset + batch_size, num_sample)]
     offset = min(offset + batch_size, num_sample) % num_sample
 
-    train_data = get_data_with_ids(data_folder_path, ids)
-    train_label = get_label_with_ids(label_file_path, ids)
-    print('Preprocessed. Shape of batch data: {0}'.format(train_data.shape))
+    train_data = get_data_with_ids(data_folder_path, batch_ids)
+    train_label = get_label_with_ids(label_file_path, batch_ids)
+#   print('Preprocessed. Shape of batch data: {0}'.format(train_data.shape))
 
     feed_dict = {tf_train_dataset: np.array(train_data), tf_train_labels: np.array(train_label)}
     _, l, predictions = session.run([train_op, loss, train_prediction],
@@ -180,8 +186,8 @@ with tf.Session(config=config) as session:
                                     options=run_options,
                                     run_metadata=run_metadata)
 
-    print('Predicstions: %s ' % predictions.T)
-    print('Labels: %s' % train_label.T)
+    # print('Predicstions: %s ' % predictions.T)
+    # print('Labels: %s' % train_label.T)
     print('Minibatch loss at step %d: %f' % (step, l))
 
     # Create the Timeline object, and write it to a json
