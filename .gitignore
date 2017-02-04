@@ -3,7 +3,7 @@
 *.zip
 
 #Submission files and data labels
-*.csv
+#*.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

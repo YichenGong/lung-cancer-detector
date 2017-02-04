@@ -8,7 +8,16 @@ sys.path.append('/usr/local/lib/python2.7/site-packages')
 import cv2
 import tensorflow as tf
 from tensorflow.python.client import timeline
+import pandas as pd
 
+def get_data_with_ids(folder, patient_ids):
+  data = [get_3d_data_from_dicom(folder + patient_id) for patient_id in patient_ids]
+  return np.array([preprocess(single_slice, in_depth, in_height, in_width) for single_slice in data])
+
+def get_label_with_ids(label_path, patient_ids):
+  label_file = pd.read_csv(label_path, index_col=0).T.to_dict()
+  labels = {key: value['cancer'] for key, value in label_file.items()}
+  return np.array([labels[patient_id] for patient_id in patient_ids])
 
 def get_3d_data_from_dicom(path):
   """
@@ -18,7 +27,6 @@ def get_3d_data_from_dicom(path):
   slices.sort(key=lambda x: int(x.InstanceNumber))
   print("loaded " + path)
   return np.stack([s.pixel_array for s in slices])
-
 
 def preprocess(scan, depth, height, width):
   """
@@ -52,7 +60,7 @@ def max_pool3d(input_data, depth_stride):
 
 
 # Parameters
-batch_size = 2
+batch_size = 4
 num_labels = 1
 
 in_depth = 120
@@ -137,7 +145,7 @@ with tf.device('/gpu:0'):
   # Prediction
   train_prediction = tf.sigmoid(logits)
 
-num_steps = 100
+num_steps = 10
 
 # with tf.Session(graph=graph) as session:
 config = tf.ConfigProto()
@@ -151,21 +159,26 @@ with tf.Session(config=config) as session:
   tf.global_variables_initializer().run()
   print('Initialized')
 
-  # test on two data point in one batch
-  base_path = '../data/sample/images/'
-  paths = [base_path + '0a0c32c9e08cc2ea76a71649de56be6d',
-           base_path + '0c60f4b87afcb3e2dfa65abbbf3ef2f9']
-  data = [get_3d_data_from_dicom(path) for path in paths]
+  # get patient_ids
+  data_folder_path = '../data/sample/images/'
+  label_file_path = '../data/stage1_labels.csv'
+  ids = os.listdir(data_folder_path)
+  num_sample = len(ids)
 
-  train_data = np.array([preprocess(single_slice, in_depth, in_height, in_width) for single_slice in data])
-  train_label = np.array([[1], [0]])
-
-  print('Preprocessed. Shape of training data: {0}'.format(train_data.shape))
-
+  offset = 0
   for step in range(num_steps):
+    batch_ids = ids[offset: min(offset + batch_size, num_sample)]
+    offset = min(offset + batch_size, num_sample) % num_sample
+
+    train_data = get_data_with_ids(data_folder_path, ids)
+    train_label = get_label_with_ids(label_file_path, ids)
+    print('Preprocessed. Shape of batch data: {0}'.format(train_data.shape))
+
     feed_dict = {tf_train_dataset: np.array(train_data), tf_train_labels: np.array(train_label)}
     _, l, predictions = session.run([train_op, loss, train_prediction],
-                                    feed_dict=feed_dict, options=run_options, run_metadata=run_metadata)
+                                    feed_dict=feed_dict,
+                                    options=run_options,
+                                    run_metadata=run_metadata)
 
     print('Predicstions: %s ' % predictions.T)
     print('Labels: %s' % train_label.T)
