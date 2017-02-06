@@ -1,3 +1,6 @@
+#PyCharm workspace files
+.idea
+
 #Data files
 *.7z
 *.zip
