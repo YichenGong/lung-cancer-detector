@@ -3,7 +3,8 @@
 #PBS -l nodes=1:ppn=1
 #PBS -l walltime=20:00:00
 #PBS -l mem=2GB
-#PBS -M chirag.m@nyu.edu
+#PBS -j oe
+#PBS -N DSB_downloadData
 
 cd $SCRATCH
 
