@@ -16,10 +16,12 @@ module load keras/1.1.1
 module load matplotlib/intel/1.5.3
 module load pandas/intel/0.17.1
 module load jupyter/1.0.0
+module load cython/intel/0.25.2
 
 module list
 
 pip install --user pydicom
+pip install --user scikit-image
 
 jupyter_port=$(shuf -i 6000-7000 -n 1)
 ssh_port=$(shuf -i 7000-8000 -n 1)
