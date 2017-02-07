@@ -9,14 +9,15 @@ cd $SCRATCH/lung-cancer-detector
 
 ## do not need to modify after this line
 module purge
+module purge
 module load opencv/intel/2.4.10
-module load tensorflow/python3.5.1/20161029
-module load keras/python3.5.1/1.1.1
+module load tensorflow/python2.7/20161207
+module load keras/1.1.1
 module load matplotlib/intel/1.5.3
-module load pandas/intel/0.18.1
-module load scikit-learn/intel/0.18.1
-module load numpy/intel/1.12.0
+module load pandas/intel/0.17.1
 module load jupyter/1.0.0
+
+module list
 
 pip install --user pydicom
 
