@@ -1,55 +1,55 @@
 from __future__ import print_function
-import numpy as np
-import dicom
-import os
-import sys
-import cv2
+# import numpy as np
+# import dicom
+# import os
+# import cv2
 import tensorflow as tf
 from tensorflow.python.client import timeline
-import pandas as pd
+# import pandas as pd
+
+from load_data import DataLoad
 
 
 
-
-def get_data_with_ids(folder, patient_ids):
-  data = [get_3d_data_from_dicom(folder + patient_id) for patient_id in patient_ids]
-  return np.array([preprocess(single_slice, in_depth, in_height, in_width) for single_slice in data])
-
-def get_label_with_ids(label_path, patient_ids):
-  label_file = pd.read_csv(label_path, index_col=0).T.to_dict()
-  labels = {key: value['cancer'] for key, value in label_file.items()}
-  label_array =  np.array([labels[patient_id] for patient_id in patient_ids])
-  return np.expand_dims(label_array, axis=len(label_array.shape))
-
-def get_3d_data_from_dicom(path):
-  """
-    Gets 3d data from DICOM file as (depth, width, height)
-  """
-  slices = [dicom.read_file(path + '/' + s) for s in os.listdir(path)]
-  slices.sort(key=lambda x: int(x.InstanceNumber))
-  return np.stack([s.pixel_array for s in slices])
-
-def preprocess(scan, depth, height, width):
-  """
-    Preprocess a single 3d data
-    1. Resize to a uniform size
-    2. ...
-
-  """
-
-  # change depth.
-  if scan.shape[0] > depth:
-    scan = scan[:depth]
-  else:
-    scan = scan
-    # TODO: fill with air
-
-  # resize width and height
-  scan = np.array([cv2.resize(single_slice, (height, width)) for single_slice in scan])
-
-  # This expansion add channel dimension as last dimension
-  scan = np.expand_dims(scan, axis=len(scan.shape))
-  return scan
+# def get_data_with_ids(folder, patient_ids):
+#   data = [get_3d_data_from_dicom(folder + patient_id) for patient_id in patient_ids]
+#   return np.array([preprocess(single_slice, in_depth, in_height, in_width) for single_slice in data])
+#
+# def get_label_with_ids(label_path, patient_ids):
+#   label_file = pd.read_csv(label_path, index_col=0).T.to_dict()
+#   labels = {key: value['cancer'] for key, value in label_file.items()}
+#   label_array =  np.array([labels[patient_id] for patient_id in patient_ids])
+#   return np.expand_dims(label_array, axis=len(label_array.shape))
+#
+# def get_3d_data_from_dicom(path):
+#   """
+#     Gets 3d data from DICOM file as (depth, width, height)
+#   """
+#   slices = [dicom.read_file(path + '/' + s) for s in os.listdir(path)]
+#   slices.sort(key=lambda x: int(x.InstanceNumber))
+#   return np.stack([s.pixel_array for s in slices])
+#
+# def preprocess(scan, depth, height, width):
+#   """
+#     Preprocess a single 3d data
+#     1. Resize to a uniform size
+#     2. ...
+#
+#   """
+#
+#   # change depth.
+#   if scan.shape[0] > depth:
+#     scan = scan[:depth]
+#   else:
+#     scan = scan
+#     # TODO: fill with air
+#
+#   # resize width and height
+#   scan = np.array([cv2.resize(single_slice, (height, width)) for single_slice in scan])
+#
+#   # This expansion add channel dimension as last dimension
+#   scan = np.expand_dims(scan, axis=len(scan.shape))
+#   return scan
 
 
 def conv3d(input_data, w, stride):
@@ -157,26 +157,34 @@ with tf.Session(config=config) as session:
   tf.global_variables_initializer().run()
   print('Initialized')
 
-  # get patient_ids
-  data_folder_path = '../data/sample/images/'
-  label_file_path = '../data/stage1_labels.csv'
-  ids = os.listdir(data_folder_path)
-  ids = [item for item in ids if not item.startswith(".")]
-  label_file = pd.read_csv(label_file_path, index_col=0).T.to_dict()
-  labels = {key: value['cancer'] for key, value in label_file.items()}
-  ids = [p_id for p_id in ids if p_id in labels.keys()]
-  num_sample = len(ids)
-  print('Total Number of data points: %d' % (num_sample))
+  # # get patient_ids
+  # data_folder_path = '../data/sample/images/'
+  # label_file_path = '../data/stage1_labels.csv'
+  # ids = os.listdir(data_folder_path)
+  # ids = [item for item in ids if not item.startswith(".")]
+  # label_file = pd.read_csv(label_file_path, index_col=0).T.to_dict()
+  # labels = {key: value['cancer'] for key, value in label_file.items()}
+  # ids = [p_id for p_id in ids if p_id in labels.keys()]
+  # num_sample = len(ids)
+  # print('Total Number of data points: %d' % num_sample)
+
+
+  flags = tf.app.flags
+  flags.DEFINE_integer("width", in_width, "width")
+  flags.DEFINE_integer("height", in_height, "height")
+  flags.DEFINE_integer("layers", in_depth, "layers")
+  flags.DEFINE_integer("batch_size", 3, "batch size")
+  flags.DEFINE_bool("is_train", True, "is train")
+  flags.DEFINE_string("data_type", "sample", "sample or stage1")
+  config = flags.FLAGS
+
+  data_loader = DataLoad(config=config)
 
   offset = 0
   for step in range(num_steps):
-    batch_ids = ids[offset: min(offset + batch_size, num_sample)]
-    offset = min(offset + batch_size, num_sample) % num_sample
 
-    train_data = get_data_with_ids(data_folder_path, batch_ids)
-    train_label = get_label_with_ids(label_file_path, batch_ids)
-
-    feed_dict = {tf_train_dataset: np.array(train_data), tf_train_labels: np.array(train_label)}
+    train_data, train_label = data_loader.next_batch()
+    feed_dict = {tf_train_dataset: train_data, tf_train_labels: train_label}
     _, l, predictions = session.run([train_op, loss, train_prediction],
                                     feed_dict=feed_dict,
                                     options=run_options,
@@ -184,7 +192,7 @@ with tf.Session(config=config) as session:
 
     print('Minibatch loss at step %d: %f' % (step, l))
 
-    # Create the Timeline object, and write it to a json
+    # Running time debug, creates the Timeline object, and write it to a json
     # go to the page 'chrome://tracing' and load the timeline.json file
     tl = timeline.Timeline(run_metadata.step_stats)
     ctf = tl.generate_chrome_trace_format()
