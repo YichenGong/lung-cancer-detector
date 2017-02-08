@@ -100,3 +100,8 @@ pyenv/
 .idea/
 data/sample/images/
 *.tfmodel
+
+# sync
+sync.sh
+
+.DS_Store
