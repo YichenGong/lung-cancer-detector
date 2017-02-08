@@ -38,7 +38,7 @@ class DataLoad():
             resized_scan = self.resize(scan)
             batch_sample.append(resized_scan)
         self.current_idx = (self.current_idx + self.batch_size) % self.num_patients 
-        return np.stack(batch_sample)
+        return np.stack(batch_sample), np.array([self.labels[pid] for pid in patient_id_next_batch])
 
 
     def resize(self, scan):
@@ -250,5 +250,5 @@ if __name__ == '__main__':
     # data_loader.preprocess_data("stage1")
     # print("Done preprocess stage 1")
     for i in range(20):
-        batch_data = data_loader.next_batch()
+        batch_data, label = data_loader.next_batch()
         print(batch_data.shape)
