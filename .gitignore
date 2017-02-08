@@ -1,9 +1,12 @@
+#PyCharm workspace files
+.idea
+
 #Data files
 *.7z
 *.zip
 
 #Submission files and data labels
-*.csv
+#*.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
