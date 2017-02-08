@@ -1,56 +1,11 @@
 from __future__ import print_function
-# import numpy as np
-# import dicom
-# import os
-# import cv2
+import numpy as np
 import tensorflow as tf
 from tensorflow.python.client import timeline
-# import pandas as pd
-
 from load_data import DataLoad
 
-
-
-# def get_data_with_ids(folder, patient_ids):
-#   data = [get_3d_data_from_dicom(folder + patient_id) for patient_id in patient_ids]
-#   return np.array([preprocess(single_slice, in_depth, in_height, in_width) for single_slice in data])
-#
-# def get_label_with_ids(label_path, patient_ids):
-#   label_file = pd.read_csv(label_path, index_col=0).T.to_dict()
-#   labels = {key: value['cancer'] for key, value in label_file.items()}
-#   label_array =  np.array([labels[patient_id] for patient_id in patient_ids])
-#   return np.expand_dims(label_array, axis=len(label_array.shape))
-#
-# def get_3d_data_from_dicom(path):
-#   """
-#     Gets 3d data from DICOM file as (depth, width, height)
-#   """
-#   slices = [dicom.read_file(path + '/' + s) for s in os.listdir(path)]
-#   slices.sort(key=lambda x: int(x.InstanceNumber))
-#   return np.stack([s.pixel_array for s in slices])
-#
-# def preprocess(scan, depth, height, width):
-#   """
-#     Preprocess a single 3d data
-#     1. Resize to a uniform size
-#     2. ...
-#
-#   """
-#
-#   # change depth.
-#   if scan.shape[0] > depth:
-#     scan = scan[:depth]
-#   else:
-#     scan = scan
-#     # TODO: fill with air
-#
-#   # resize width and height
-#   scan = np.array([cv2.resize(single_slice, (height, width)) for single_slice in scan])
-#
-#   # This expansion add channel dimension as last dimension
-#   scan = np.expand_dims(scan, axis=len(scan.shape))
-#   return scan
-
+def expand_last_dim(input_data):
+  return np.expand_dims(input_data, axis=len(input_data.shape))
 
 def conv3d(input_data, w, stride):
   return tf.nn.conv3d(input_data, w, strides=stride, padding='SAME')
@@ -58,7 +13,6 @@ def conv3d(input_data, w, stride):
 
 def max_pool3d(input_data, depth_stride):
   return tf.nn.max_pool3d(input_data, [1, depth_stride, 2, 2, 1], [1, depth_stride, 2, 2, 1], padding='SAME')
-
 
 # Parameters
 batch_size = 20
@@ -80,12 +34,8 @@ layer2_channels = 32
 num_hidden = 64
 
 # Graph
-
-# graph = tf.Graph()
-# with graph.as_default():
 with tf.device('/gpu:0'):
   # Input data.
-
   tf_train_dataset = tf.placeholder(
     tf.float32, [None, in_depth, in_height, in_width, in_channels])
   tf_train_labels = tf.placeholder(tf.float32, [None, num_labels])
@@ -132,7 +82,7 @@ with tf.device('/gpu:0'):
   # Training computation.
   logits = model(tf_train_dataset)
   # Prediction
-  loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits, tf_train_labels))
+  loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf_train_labels, logits=logits))
 
   # Optimizer.
   optimizer = tf.train.GradientDescentOptimizer(0.05)
@@ -144,8 +94,6 @@ with tf.device('/gpu:0'):
   train_prediction = tf.sigmoid(logits)
 
 num_steps = 1000
-
-# with tf.Session(graph=graph) as session:
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 config.log_device_placement=False
@@ -157,23 +105,11 @@ with tf.Session(config=config) as session:
   tf.global_variables_initializer().run()
   print('Initialized')
 
-  # # get patient_ids
-  # data_folder_path = '../data/sample/images/'
-  # label_file_path = '../data/stage1_labels.csv'
-  # ids = os.listdir(data_folder_path)
-  # ids = [item for item in ids if not item.startswith(".")]
-  # label_file = pd.read_csv(label_file_path, index_col=0).T.to_dict()
-  # labels = {key: value['cancer'] for key, value in label_file.items()}
-  # ids = [p_id for p_id in ids if p_id in labels.keys()]
-  # num_sample = len(ids)
-  # print('Total Number of data points: %d' % num_sample)
-
-
   flags = tf.app.flags
   flags.DEFINE_integer("width", in_width, "width")
   flags.DEFINE_integer("height", in_height, "height")
   flags.DEFINE_integer("layers", in_depth, "layers")
-  flags.DEFINE_integer("batch_size", 3, "batch size")
+  flags.DEFINE_integer("batch_size", batch_size, "batch size")
   flags.DEFINE_bool("is_train", True, "is train")
   flags.DEFINE_string("data_type", "sample", "sample or stage1")
   config = flags.FLAGS
@@ -184,6 +120,9 @@ with tf.Session(config=config) as session:
   for step in range(num_steps):
 
     train_data, train_label = data_loader.next_batch()
+    train_data = expand_last_dim(train_data) # add channel dim
+    train_label = expand_last_dim(train_label) # make (size,), to (size, 1)
+
     feed_dict = {tf_train_dataset: train_data, tf_train_labels: train_label}
     _, l, predictions = session.run([train_op, loss, train_prediction],
                                     feed_dict=feed_dict,
