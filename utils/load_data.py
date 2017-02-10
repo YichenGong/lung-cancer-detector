@@ -164,6 +164,7 @@ class DataLoad():
             pickle.dump(segmented_lungs_fill, fh)
             fh.close()
 
+
     # def multiprocess_preprocess_data(self, typeData="stage1", patient_ids):
     #     for idx, patientId in enumerate(self.patients):
     #         print("Processing " + str(idx) + " image")
@@ -194,7 +195,7 @@ class DataLoad():
             resized_scan = self.resize(scan)
             fh = open(folder_name + "/" + patientId +".p", 'wb')
             pickle.dump(resized_scan, fh)
-            fh.close()
+
 
 
     def load_scan(self,path):
@@ -320,6 +321,8 @@ if __name__ == '__main__':
 
     # data_loader.preprocess_data("stage1")
     # print("Done preprocess stage 1")
-    # # for i in range(20):
-    # batch_data, label = data_loader.next_batch()
-    # print(batch_data.shape)
+
+    for i in range(20):
+        batch_data, label = data_loader.next_batch()
+        print(batch_data.shape)
+
