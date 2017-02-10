@@ -13,6 +13,7 @@ import tensorflow as tf
 
 
 
+
 class DataLoad():
     def __init__(self,config):
         # INPUT_FOLDER = config.input_folder 
@@ -24,21 +25,67 @@ class DataLoad():
         self.data_type = config.data_type
         self.padding_number = 0
         self.is_train = config.is_train
+        self.num_process = config.num_process
+        # print(config)
+        self.folder_name = "data/preprocessed/" + self.data_type + "/" + str(self.layers) + "_" + str(self.width) + "_" + str(self.height)
 
         self._build_data_info(self.data_type)
 
 
 
     def next_batch(self):
-        idx_next_batch = [(self.current_idx + i) % self.num_patients for i in range(self.batch_size)]
-        patient_id_next_batch = [ self.patient_ids[idx] for idx in idx_next_batch]
-        batch_sample = []
+        assert(self.train or self.validation or self.test, "Please set mode, train, validation or test. e.g. DataLoad.train()")
+        idx_next_batch = [self.current_idx + i for i in range(self.batch_size) if self.current_idx + i < self.num_patients]
+        patient_id_next_batch = [ self.pids[idx] for idx in idx_next_batch]
+        
+        # p = Pool(self.num_process)
+        # batch_sample =  p.map(func=self.single_process_task,iterable=patient_id_next_batch)
+        # p.close()
         for patient_id in patient_id_next_batch:
-            scan = pickle.load(open("data/preprocessed/" + self.data_type + "/" + patient_id + ".p","rb"))
-            resized_scan = self.resize(scan)
-            batch_sample.append(resized_scan)
-        self.current_idx = (self.current_idx + self.batch_size) % self.num_patients 
+            scan = pickle.load(open(self.folder_name + "/" + patient_id + ".p","rb"))
+            # resized_scan = self.resize(scan)
+            batch_sample.append(scan)
+        self.current_idx = self.current_idx + self.batch_size
         return np.stack(batch_sample), np.array([self.labels[pid] for pid in patient_id_next_batch])
+
+    def has_next_batch(self):
+        return self.current_idx < len(self.pids)
+
+
+    def train(self):
+        self.pids = self.train_ids
+        self.reset(mode="train")
+
+
+    def validation(self):
+        self.pids = self.validatioin_ids
+        self.reset(mode="validation")
+        
+
+    def test(self):
+        self.pids = self.test_ids
+        self.reset(mode="test")
+        
+
+    def reset(self, mode):
+        assert(mode=="train" or mode=="validation" or mode=="test", "set reset mode to train, validation or test")
+        self.train = self.validation = self.test = False
+        if mode == "train":
+            self.train = True
+        elif mode == "validation":
+            self.validation = True 
+        else:
+            self.test = True
+        self.current_idx = 0
+        self.num_patients = len(self.train_ids)
+        self.read_idx = list(np.random.permutation(self.num_patients))
+
+
+    def single_process_task(self, patient_id, data_type):
+        scan = pickle.load(open("data/preprocessed/" + self.data_type + "/" + patient_id + ".p","rb"))
+        resized_scan = self.resize(scan)
+        return resized_scan
+        # batch_sample.append(resized_scan)
 
 
     def resize(self, scan):
@@ -52,7 +99,6 @@ class DataLoad():
         #     top_pad = np.zeros((top_layer, self.height, self.width)) + self.padding_number
         #     bottom_pad = np.zeros((bottom_layer, self.height, self.width)) + self.padding_number
         #     resized_scan = np.vstack([top_pad, scan, bottom_pad])
-
         # else:
         #     # peel
         #     top_layer = (scan_layer - self.layers) / 2
@@ -73,17 +119,16 @@ class DataLoad():
 
     def _build_data_info(self,typeData="sample"):
         assert(typeData == "sample" or typeData == "stage1")
-        files = os.listdir("data/preprocessed/" + typeData + "/")
-        files = [f for f in files if f.endswith(".p")]
         self.labels = self._build_labels()
-        self.patient_ids = [fn.rstrip(".p") for fn in files]
-        if self.is_train:
-            self.patient_ids = [i for i in self.patient_ids if self.labels.get(i, -1) != -1]
         self.num_patients = len(self.patient_ids)
-        self.read_idx = list(np.random.permutation(self.num_patients))
-        self.current_idx = 0
+        
+        
 
 
+        # load data ids from json
+        self.train_ids = []
+        self.validatioin_ids = []
+        self.test_ids = []
 
         
 
@@ -94,12 +139,19 @@ class DataLoad():
         else:
             self.input_folder = 'data/stage1/images/'
 
-        self.patients = os.listdir(self.input_folder)
-        self.patients.sort() # patient ids 
-        self.patients = [item for item in self.patients if not item.startswith("._")]
+        processed_files = os.listdir("data/preprocessed/" + typeData + "/")
+        processed_files = [f for f in processed_files if f.endswith(".p")]
+        processed_patient_ids = [fn.rstrip(".p") for fn in processed_files]
+        # print(len(processed_patient_ids))
+
+        patients = os.listdir(self.input_folder)
+        patients.sort() # patient ids 
+        # print("{} patients to be processed.".format(len(patients)))
+        patients = [item for item in patients if (not item.startswith("._") and item not in processed_patient_ids)]
+        print("{} patients to be processed.".format(len(patients)))
 
         
-        for idx, patientId in enumerate(self.patients):
+        for idx, patientId in enumerate(patients):
             print("Processing " + str(idx) + " image")
             patient_scan = self.load_scan(self.input_folder + patientId)
             patient_pixel = self.get_pixels_hu(patient_scan)
@@ -112,18 +164,36 @@ class DataLoad():
             pickle.dump(segmented_lungs_fill, fh)
             fh.close()
 
-    def multiprocess_preprocess_data(self, typeData="stage1", patient_ids):
-        for idx, patientId in enumerate(self.patients):
-            print("Processing " + str(idx) + " image")
-            patient_scan = self.load_scan(self.input_folder + patientId)
-            patient_pixel = self.get_pixels_hu(patient_scan)
-            pix_resampled, spacing = self.resample(patient_pixel, patient_scan, [1,1,1])
-            segmented_lungs_fill = self.segment_lung_mask(pix_resampled, True)
-            scans[patientId] = segmented_lungs_fill
-            print("finish " + str(idx))
-            print(segmented_lungs_fill.shape)
-            fh = open("data/preprocessed/" + typeData + "/" + patientId +".p", 'wb')
-            pickle.dump(scans, fh)
+    # def multiprocess_preprocess_data(self, typeData="stage1", patient_ids):
+    #     for idx, patientId in enumerate(self.patients):
+    #         print("Processing " + str(idx) + " image")
+    #         patient_scan = self.load_scan(self.input_folder + patientId)
+    #         patient_pixel = self.get_pixels_hu(patient_scan)
+    #         pix_resampled, spacing = self.resample(patient_pixel, patient_scan, [1,1,1])
+    #         segmented_lungs_fill = self.segment_lung_mask(pix_resampled, True)
+    #         scans[patientId] = segmented_lungs_fill
+    #         print("finish " + str(idx))
+    #         print(segmented_lungs_fill.shape)
+    #         fh = open("data/preprocessed/" + typeData + "/" + patientId +".p", 'wb')
+    #         pickle.dump(scans, fh)
+    #         fh.close()
+
+    def resize_whole_dataset(self, typeData="stage1"):
+        patients = os.listdir(self.input_folder)
+        patients.sort()
+        patients = [item for item in patients if (not item.startswith("._")]
+        self.folder_name = "data/preprocessed/" + typeData + "/" + str(self.layers) + "_" + str(self.width) + "_" + str(self.height)
+        if (os.path.isdir(folder_name):
+            processed_patient_ids =  [fn.rstrip(".p") for fn in os.listdir(folder_name)]
+            patients = [item for item in patients if item not in processed_patient_ids]
+        else:
+            os.mkdir(folder_name)
+        print("Resizing " + str(len(patients)) + " 3-D images")
+        for patient_id in patients:
+            scan = pickle.load(open("data/preprocessed/original/" + typeData + "/" + patient_id + ".p","rb"))
+            resized_scan = self.resize(scan)
+            fh = open(folder_name + "/" + patientId +".p", 'wb')
+            pickle.dump(resized_scan, fh)
             fh.close()
 
 
@@ -239,6 +309,7 @@ if __name__ == '__main__':
     flags.DEFINE_integer("height", 300, "height")
     flags.DEFINE_integer("layers", 300, "layers")
     flags.DEFINE_integer("batch_size", 3, "batch size")
+    flags.DEFINE_integer("num_process", 1, "process number")
     flags.DEFINE_bool("is_train", True, "is train")
     flags.DEFINE_string("data_type", "sample", "sample or stage1")
     config = flags.FLAGS
@@ -249,6 +320,6 @@ if __name__ == '__main__':
 
     # data_loader.preprocess_data("stage1")
     # print("Done preprocess stage 1")
-    for i in range(20):
-        batch_data, label = data_loader.next_batch()
-        print(batch_data.shape)
+    # # for i in range(20):
+    # batch_data, label = data_loader.next_batch()
+    # print(batch_data.shape)
