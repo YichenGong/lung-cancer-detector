@@ -8,7 +8,7 @@ flags = tf.app.flags
 flags.DEFINE_integer("width", 128, "width")
 flags.DEFINE_integer("height", 128, "height")
 flags.DEFINE_integer("layers", 128, "layers")
-flags.DEFINE_integer("batch_size", 10, "batch size")
+flags.DEFINE_integer("batch_size", 20, "batch size")
 flags.DEFINE_integer("num_process", 1, "process number")
 flags.DEFINE_bool("is_train", True, "is train")
 flags.DEFINE_string("data_type", "stage1", "sample or stage1")
@@ -41,8 +41,8 @@ filter_width = 3
 conv_stride = [1, 1, 1, 1, 1]
 
 layer11_channels = 4
-layer12_channels = 8
-layer2_channels = 16
+layer12_channels = 6
+layer2_channels = 8
 
 num_hidden = 64
 num_labels = 1
@@ -65,14 +65,14 @@ with tf.device('/gpu:0'):
 
   layer2_weights = tf.Variable(tf.truncated_normal(
     [filter_depth, filter_height, filter_width, layer12_channels, layer2_channels], stddev=1.0))
-  layer2_biases = tf.Variable(tf.constant(1.0, shape=[layer2_channels]))
+  layer2_biases = tf.Variable(tf.constant(0.0, shape=[layer2_channels]))
 
   layer3_weights = tf.Variable(tf.truncated_normal(
     [in_depth // 4 * in_height // 4 * in_width // 4 * layer2_channels, num_hidden], stddev=1.0))
   layer3_biases = tf.Variable(tf.constant(0.0, shape=[num_hidden]))
 
   layer4_weights = tf.Variable(tf.truncated_normal(
-    [num_hidden, num_labels], stddev=0.1))
+    [num_hidden, num_labels], stddev=0.5))
   layer4_biases = tf.Variable(tf.constant(0.0, shape=[num_labels]))
 
 
@@ -91,11 +91,9 @@ with tf.device('/gpu:0'):
     conv2 = conv3d(pool1, layer2_weights, conv_stride)
     conv2 = tf.nn.relu(conv2 + layer2_biases)
     pool2 = max_pool3d(conv2, 2)
-    pool2 = tf.nn.dropout(pool2, 0.7)
 
     shape = pool2.get_shape().as_list()
     reshape = tf.reshape(pool2, [tf.shape(data)[0], shape[1] * shape[2] * shape[3] * shape[4]])
-    reshape = tf.nn.dropout(reshape, 0.6)    
 
     hidden = tf.nn.relu(tf.matmul(reshape, layer3_weights) + layer3_biases)
     return tf.matmul(hidden, layer4_weights) + layer4_biases
@@ -105,7 +103,7 @@ with tf.device('/gpu:0'):
   loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits, tf_labels))
 
   # Optimizer.
-  optimizer = tf.train.AdamOptimizer(0.1)
+  optimizer = tf.train.AdamOptimizer(0.03)
   grads = optimizer.compute_gradients(loss)
   capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in grads]
   train_op = optimizer.apply_gradients(capped_gvs)
@@ -115,7 +113,7 @@ with tf.device('/gpu:0'):
 
 
 # Training
-num_epochs = 20
+num_epochs = 2
 sess_config = tf.ConfigProto()
 sess_config.gpu_options.allow_growth = True
 sess_config.log_device_placement=False
