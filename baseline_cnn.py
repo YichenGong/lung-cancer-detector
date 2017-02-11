@@ -7,7 +7,7 @@ flags = tf.app.flags
 flags.DEFINE_integer("width", 128, "width")
 flags.DEFINE_integer("height", 128, "height")
 flags.DEFINE_integer("layers", 128, "layers")
-flags.DEFINE_integer("batch_size", 20, "batch size")
+flags.DEFINE_integer("batch_size", 10, "batch size")
 flags.DEFINE_integer("num_process", 1, "process number")
 flags.DEFINE_bool("is_train", True, "is train")
 flags.DEFINE_string("data_type", "stage1", "sample or stage1")
@@ -39,7 +39,8 @@ filter_height = 3
 filter_width = 3
 conv_stride = [1, 1, 1, 1, 1]
 
-layer1_channels = 8
+layer11_channels = 8
+layer12_channels = 8
 layer2_channels = 32
 
 num_hidden = 64
@@ -53,12 +54,16 @@ with tf.device('/gpu:0'):
   tf_labels = tf.placeholder(tf.float32, [None, num_labels])
 
   # Variables.
-  layer1_weights = tf.Variable(tf.truncated_normal(
-    [filter_depth, filter_height, filter_width, in_channels, layer1_channels], stddev=0.1))
-  layer1_biases = tf.Variable(tf.zeros([layer1_channels]))
+  layer11_weights = tf.Variable(tf.truncated_normal(
+    [filter_depth, filter_height, filter_width, in_channels, layer11_channels], stddev=0.1))
+  layer11_biases = tf.Variable(tf.zeros([layer11_channels]))
+
+  layer12_weights = tf.Variable(tf.truncated_normal(
+    [filter_depth, filter_height, filter_width, layer11_channels, layer12_channels], stddev=0.1))
+  layer12_biases = tf.Variable(tf.zeros([layer12_channels]))
 
   layer2_weights = tf.Variable(tf.truncated_normal(
-    [filter_depth, filter_height, filter_width, layer1_channels, layer2_channels], stddev=0.1))
+    [filter_depth, filter_height, filter_width, layer12_channels, layer2_channels], stddev=0.1))
   layer2_biases = tf.Variable(tf.constant(1.0, shape=[layer2_channels]))
 
   layer3_weights = tf.Variable(tf.truncated_normal(
@@ -76,16 +81,20 @@ with tf.device('/gpu:0'):
     max_v = tf.reduce_max(data)
     data = tf.realdiv(data, max_v)
 
-    conv1 = conv3d(data, layer1_weights, conv_stride)
-    conv1 = tf.nn.relu(conv1 + layer1_biases)
-    pool1 = max_pool3d(conv1, 2)
+    conv11 = conv3d(data, layer11_weights, conv_stride)
+    conv11 = tf.nn.relu(conv11 + layer11_biases)
+    conv12 = conv3d(conv11, layer12_weights, conv_stride)
+    conv12 = tf.nn.relu(conv12 + layer12_biases)
+    pool1 = max_pool3d(conv12, 2)
 
     conv2 = conv3d(pool1, layer2_weights, conv_stride)
     conv2 = tf.nn.relu(conv2 + layer2_biases)
     pool2 = max_pool3d(conv2, 2)
+    pool2 = tf.nn.dropout(pool2, 0.7)
 
     shape = pool2.get_shape().as_list()
     reshape = tf.reshape(pool2, [tf.shape(data)[0], shape[1] * shape[2] * shape[3] * shape[4]])
+    reshape = tf.nn.dropout(reshape, 0.6)    
 
     hidden = tf.nn.relu(tf.matmul(reshape, layer3_weights) + layer3_biases)
     return tf.matmul(hidden, layer4_weights) + layer4_biases
@@ -95,9 +104,9 @@ with tf.device('/gpu:0'):
   loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits, tf_labels))
 
   # Optimizer.
-  optimizer = tf.train.AdamOptimizer(0.03)
+  optimizer = tf.train.AdamOptimizer(0.1)
   grads = optimizer.compute_gradients(loss)
-  capped_gvs = [(tf.clip_by_value(grad, -10., 10.), var) for grad, var in grads]
+  capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in grads]
   train_op = optimizer.apply_gradients(capped_gvs)
 
   # Prediction
