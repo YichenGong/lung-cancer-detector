@@ -1,7 +1,7 @@
 from __future__ import print_function
 import numpy as np
 import tensorflow as tf
-from load_data import DataLoad
+from utils.load_data import DataLoad
 
 flags = tf.app.flags
 flags.DEFINE_integer("width", 128, "width")
@@ -39,9 +39,9 @@ filter_height = 3
 filter_width = 3
 conv_stride = [1, 1, 1, 1, 1]
 
-layer11_channels = 8
+layer11_channels = 4
 layer12_channels = 8
-layer2_channels = 32
+layer2_channels = 16
 
 num_hidden = 64
 num_labels = 1
@@ -55,24 +55,24 @@ with tf.device('/gpu:0'):
 
   # Variables.
   layer11_weights = tf.Variable(tf.truncated_normal(
-    [filter_depth, filter_height, filter_width, in_channels, layer11_channels], stddev=0.1))
+    [filter_depth, filter_height, filter_width, in_channels, layer11_channels], stddev=1.0))
   layer11_biases = tf.Variable(tf.zeros([layer11_channels]))
 
   layer12_weights = tf.Variable(tf.truncated_normal(
-    [filter_depth, filter_height, filter_width, layer11_channels, layer12_channels], stddev=0.1))
+    [filter_depth, filter_height, filter_width, layer11_channels, layer12_channels], stddev=1.0))
   layer12_biases = tf.Variable(tf.zeros([layer12_channels]))
 
   layer2_weights = tf.Variable(tf.truncated_normal(
-    [filter_depth, filter_height, filter_width, layer12_channels, layer2_channels], stddev=0.1))
+    [filter_depth, filter_height, filter_width, layer12_channels, layer2_channels], stddev=1.0))
   layer2_biases = tf.Variable(tf.constant(1.0, shape=[layer2_channels]))
 
   layer3_weights = tf.Variable(tf.truncated_normal(
-    [in_depth // 4 * in_height // 4 * in_width // 4 * layer2_channels, num_hidden], stddev=0.1))
-  layer3_biases = tf.Variable(tf.constant(1.0, shape=[num_hidden]))
+    [in_depth // 4 * in_height // 4 * in_width // 4 * layer2_channels, num_hidden], stddev=1.0))
+  layer3_biases = tf.Variable(tf.constant(0.0, shape=[num_hidden]))
 
   layer4_weights = tf.Variable(tf.truncated_normal(
     [num_hidden, num_labels], stddev=0.1))
-  layer4_biases = tf.Variable(tf.constant(1.0, shape=[num_labels]))
+  layer4_biases = tf.Variable(tf.constant(0.0, shape=[num_labels]))
 
 
   # Model.
@@ -114,7 +114,7 @@ with tf.device('/gpu:0'):
 
 
 # Training
-num_epochs = 1
+num_epochs = 20
 sess_config = tf.ConfigProto()
 sess_config.gpu_options.allow_growth = True
 sess_config.log_device_placement=False
@@ -170,7 +170,7 @@ with tf.Session(config=sess_config) as session:
 
   # TODO: write the predictions to file.
   print("Now update csv")
-
+  
 
 
 
