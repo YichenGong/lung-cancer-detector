@@ -1,4 +1,5 @@
 from __future__ import print_function
+import csv
 import numpy as np
 import tensorflow as tf
 from utils.load_data import DataLoad
@@ -166,11 +167,15 @@ with tf.Session(config=sess_config) as session:
     feed_dict = {tf_dataset : test_data}
     preds = session.run(prediction, feed_dict=feed_dict)
     for i in range(test_data.shape[0]):
-      pred_dict[test_id[i]] = preds[i]
+      pred_dict[test_id[i]] = preds[i][0]
 
   # TODO: write the predictions to file.
   print("Now update csv")
-  
-
-
-
+  with open('submission_backup.csv', 'w') as f:
+    writer = csv.writer(f)
+    # write the header
+    for row in {'id':'cancer'}.items():
+      writer.writerow(row)
+    # write the content
+    for row in pred_dict.items():
+      writer.writerow(row)
