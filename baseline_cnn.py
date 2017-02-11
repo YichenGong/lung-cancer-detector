@@ -1,7 +1,6 @@
 from __future__ import print_function
 import numpy as np
 import tensorflow as tf
-from tensorflow.python.client import timeline
 from load_data import DataLoad
 
 flags = tf.app.flags
@@ -10,11 +9,14 @@ flags.DEFINE_integer("height", 128, "height")
 flags.DEFINE_integer("layers", 100, "layers")
 flags.DEFINE_integer("batch_size", 5, "batch size")
 flags.DEFINE_bool("is_train", True, "is train")
-flags.DEFINE_string("data_type", "sample", "sample or stage1")
+flags.DEFINE_string("data_type", "stage1", "sample or stage1")
 config = flags.FLAGS
 
-def expand_last_dim(input_data):
-  return np.expand_dims(input_data, axis=len(input_data.shape))
+def expand_last_dim(*input_data):
+  res = []
+  for in_data in input_data:
+    res.append(np.expand_dims(in_data, axis=len(in_data.shape)))
+  return res
 
 def conv3d(input_data, w, stride):
   return tf.nn.conv3d(input_data, w, strides=stride, padding='SAME')
@@ -42,9 +44,9 @@ num_labels = 1
 # Graph
 with tf.device('/gpu:0'):
   # Input data.
-  tf_train_dataset = tf.placeholder(
+  tf_dataset = tf.placeholder(
     tf.float32, [None, in_depth, in_height, in_width, in_channels])
-  tf_train_labels = tf.placeholder(tf.float32, [None, num_labels])
+  tf_labels = tf.placeholder(tf.float32, [None, num_labels])
 
   # Variables.
   layer1_weights = tf.Variable(tf.truncated_normal(
@@ -84,9 +86,9 @@ with tf.device('/gpu:0'):
     hidden = tf.nn.relu(tf.matmul(reshape, layer3_weights) + layer3_biases)
     return tf.matmul(hidden, layer4_weights) + layer4_biases
 
-  logits = model(tf_train_dataset)
+  logits = model(tf_dataset)
   # Prediction
-  loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf_train_labels, logits=logits))
+  loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf_labels, logits=logits))
 
   # Optimizer.
   optimizer = tf.train.GradientDescentOptimizer(0.05)
@@ -95,11 +97,11 @@ with tf.device('/gpu:0'):
   train_op = optimizer.apply_gradients(capped_gvs)
 
   # Prediction
-  train_prediction = tf.sigmoid(logits)
+  prediction = tf.sigmoid(logits)
 
 
 # Training
-num_steps = 1000
+num_epochs = 1
 sess_config = tf.ConfigProto()
 sess_config.gpu_options.allow_growth = True
 sess_config.log_device_placement=False
@@ -110,12 +112,51 @@ with tf.Session(config=sess_config) as session:
   
   data_loader = DataLoad(config=config)
 
-  for step in range(num_steps):
-    train_data, train_label = data_loader.next_batch()
-    train_data = expand_last_dim(train_data) # add channel dim
-    train_label = expand_last_dim(train_label) # make (size,), to (size, 1)
+  for epoch in range(num_epochs):
+    # Training
+    data_loader.train()
+    while data_loader.has_next_batch():
+      train_data, train_label, _ = data_loader.next_batch()
+      train_data, train_label = expand_last_dim(train_data, train_label)
 
-    feed_dict = {tf_train_dataset: train_data, tf_train_labels: train_label}
-    _, l, predictions = session.run([train_op, loss, train_prediction], feed_dict=feed_dict)
+      feed_dict = {tf_dataset: train_data, tf_labels: train_label}
+      _, l = session.run([train_op, loss], feed_dict=feed_dict)
+      print('Mini-batch loss: %f' % l)
 
-    print('Minibatch loss at step %d: %f' % (step, l))
+
+    # Validation
+    data_loader.validation()
+    total_loss = 0
+    count = 0
+    while data_loader.has_next_batch():
+      valid_data, valid_label, _ = data_loader.next_batch()
+      valid_data, valid_label = expand_last_dim(valid_data, valid_label)
+
+      feed_dict = {tf_dataset: valid_data, tf_labels: valid_label}
+      l = session.run([loss], feed_dict=feed_dict)
+      batch_size = valid_data.shape[0]
+      total_loss += l * batch_size
+      count += batch_size
+
+    valid_loss = total_loss / count
+    print('Validation loss is: %f', valid_loss)
+
+
+  # Test predictions
+  data_loader.test()
+  pred_dict = {}
+  while data_loader.has_next_batch():
+    test_data, _, test_id = expand_last_dim(data_loader.next_batch())
+    test_data = expand_last_dim(test_data)
+
+    feed_dict = {tf_dataset : test_data}
+    preds = session.run([prediction], feed_dict=feed_dict)
+    for i in range(len(test_data.shape[0])):
+      pred_dict[test_id[i]] = preds[i]
+
+  # TODO: write the predictions to file.
+  print("Now update this part.")
+
+
+
+
