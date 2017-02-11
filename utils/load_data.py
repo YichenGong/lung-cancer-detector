@@ -10,11 +10,18 @@ import pickle
 from multiprocessing import Pool, TimeoutError
 from scipy.misc import imresize
 import tensorflow as tf 
+import json
 
 
 
 
 class DataLoad():
+    """
+    If it's in train or validation mode, then next_batch() will return batch_data, batch_label, batch_patient_id.
+    If it's in test mode, then next_batch() will return batch_data, batch_label(None), batch_patient_id 
+    """
+
+
     def __init__(self,config):
         # INPUT_FOLDER = config.input_folder 
         self.config = config
@@ -27,17 +34,17 @@ class DataLoad():
         self.is_train = config.is_train
         self.num_process = config.num_process
         # print(config)
-        self.folder_name = "data/preprocessed/" + self.data_type + "/" + str(self.layers) + "_" + str(self.width) + "_" + str(self.height)
+        self.folder_name = "data/preprocessed/" + str(self.layers) + "_" + str(self.width) + "_" + str(self.height)
 
         self._build_data_info(self.data_type)
 
 
 
     def next_batch(self):
-        assert(self.train or self.validation or self.test, "Please set mode, train, validation or test. e.g. DataLoad.train()")
+        assert self.train_mode or self.validation_mode or self.test, "Please set mode, train, validation or test. e.g. DataLoad.train()"
         idx_next_batch = [self.current_idx + i for i in range(self.batch_size) if self.current_idx + i < self.num_patients]
         patient_id_next_batch = [ self.pids[idx] for idx in idx_next_batch]
-        
+        batch_sample = []
         # p = Pool(self.num_process)
         # batch_sample =  p.map(func=self.single_process_task,iterable=patient_id_next_batch)
         # p.close()
@@ -46,7 +53,11 @@ class DataLoad():
             # resized_scan = self.resize(scan)
             batch_sample.append(scan)
         self.current_idx = self.current_idx + self.batch_size
-        return np.stack(batch_sample), np.array([self.labels[pid] for pid in patient_id_next_batch])
+
+        if self.train_mode or self.validation_mode:
+            return np.stack(batch_sample), np.array([self.labels[pid] for pid in patient_id_next_batch]), patient_id_next_batch
+        else:
+            return np.stack(batch_sample), None, patient_id_next_batch
 
     def has_next_batch(self):
         return self.current_idx < len(self.pids)
@@ -68,24 +79,24 @@ class DataLoad():
         
 
     def reset(self, mode):
-        assert(mode=="train" or mode=="validation" or mode=="test", "set reset mode to train, validation or test")
-        self.train = self.validation = self.test = False
+        assert mode=="train" or mode=="validation" or mode=="test", "set reset mode to train, validation or test"
+        self.train_mode = self.validation_mode = self.test_mode = False
         if mode == "train":
-            self.train = True
+            self.train_mode = True
         elif mode == "validation":
-            self.validation = True 
+            self.validation_mode = True 
         else:
-            self.test = True
+            self.test_mode = True
         self.current_idx = 0
         self.num_patients = len(self.train_ids)
         self.read_idx = list(np.random.permutation(self.num_patients))
 
 
-    def single_process_task(self, patient_id, data_type):
-        scan = pickle.load(open("data/preprocessed/" + self.data_type + "/" + patient_id + ".p","rb"))
-        resized_scan = self.resize(scan)
-        return resized_scan
-        # batch_sample.append(resized_scan)
+    # def single_process_task(self, patient_id, data_type):
+    #     scan = pickle.load(open("data/preprocessed/" + self.data_type + "/" + patient_id + ".p","rb"))
+    #     resized_scan = self.resize(scan)
+    #     return resized_scan
+    #     # batch_sample.append(resized_scan)
 
 
     def resize(self, scan):
@@ -120,15 +131,15 @@ class DataLoad():
     def _build_data_info(self,typeData="sample"):
         assert(typeData == "sample" or typeData == "stage1")
         self.labels = self._build_labels()
-        self.num_patients = len(self.patient_ids)
-        
+        self.train_mode = self.validation_mode = self.test_mode = False
         
 
 
         # load data ids from json
-        self.train_ids = []
-        self.validatioin_ids = []
-        self.test_ids = []
+        id_splits = json.load(open('data/id_splits.json',"r"))
+        self.train_ids = id_splits['train']
+        self.validatioin_ids = id_splits['validation']
+        self.test_ids = id_splits['test']
 
         
 
@@ -139,7 +150,7 @@ class DataLoad():
         else:
             self.input_folder = 'data/stage1/images/'
 
-        processed_files = os.listdir("data/preprocessed/" + typeData + "/")
+        processed_files = os.listdir("data/preprocessed/original/" + typeData + "/")
         processed_files = [f for f in processed_files if f.endswith(".p")]
         processed_patient_ids = [fn.rstrip(".p") for fn in processed_files]
         # print(len(processed_patient_ids))
@@ -160,7 +171,7 @@ class DataLoad():
             # scans[patientId] = segmented_lungs_fill
             print("finish " + str(idx))
             print(segmented_lungs_fill.shape)
-            fh = open("data/preprocessed/" + typeData + "/" + patientId +".p", 'wb')
+            fh = open("data/preprocessed/original/" + typeData + "/" + patientId +".p", 'wb')
             pickle.dump(segmented_lungs_fill, fh)
             fh.close()
 
@@ -180,21 +191,23 @@ class DataLoad():
     #         fh.close()
 
     def resize_whole_dataset(self, typeData="stage1"):
-        patients = os.listdir(self.input_folder)
+        patients = os.listdir("data/" + typeData + "/images/")
         patients.sort()
-        patients = [item for item in patients if (not item.startswith("._")]
-        self.folder_name = "data/preprocessed/" + typeData + "/" + str(self.layers) + "_" + str(self.width) + "_" + str(self.height)
-        if (os.path.isdir(folder_name):
-            processed_patient_ids =  [fn.rstrip(".p") for fn in os.listdir(folder_name)]
+        patients = [item for item in patients if not item.startswith("._")]
+        self.folder_name = "data/preprocessed/" + str(self.layers) + "_" + str(self.width) + "_" + str(self.height)
+        if os.path.isdir(self.folder_name):
+            processed_patient_ids =  [fn.rstrip(".p") for fn in os.listdir(self.folder_name)]
             patients = [item for item in patients if item not in processed_patient_ids]
         else:
-            os.mkdir(folder_name)
+            os.mkdir(self.folder_name)
         print("Resizing " + str(len(patients)) + " 3-D images")
-        for patient_id in patients:
+        for idx , patient_id in enumerate(patients):
+            print('working on ' + str(idx) + ' patient ' + patient_id)
             scan = pickle.load(open("data/preprocessed/original/" + typeData + "/" + patient_id + ".p","rb"))
             resized_scan = self.resize(scan)
-            fh = open(folder_name + "/" + patientId +".p", 'wb')
+            fh = open(self.folder_name + "/" + patient_id +".p", 'wb')
             pickle.dump(resized_scan, fh)
+            
 
 
 
@@ -306,9 +319,9 @@ class DataLoad():
 
 if __name__ == '__main__':
     flags = tf.app.flags
-    flags.DEFINE_integer("width", 300, "width")
-    flags.DEFINE_integer("height", 300, "height")
-    flags.DEFINE_integer("layers", 300, "layers")
+    flags.DEFINE_integer("width", 128, "width")
+    flags.DEFINE_integer("height", 128, "height")
+    flags.DEFINE_integer("layers", 128, "layers")
     flags.DEFINE_integer("batch_size", 3, "batch size")
     flags.DEFINE_integer("num_process", 1, "process number")
     flags.DEFINE_bool("is_train", True, "is train")
@@ -319,10 +332,11 @@ if __name__ == '__main__':
     # data_loader.preprocess_data("sample")
     # print("Done proprocess sample")
 
-    # data_loader.preprocess_data("stage1")
-    # print("Done preprocess stage 1")
-
+    data_loader.preprocess_data("stage1")
+    print("Done preprocess stage 1")
+    data_loader.resize_whole_dataset()
+    data_loader.train()
     for i in range(20):
-        batch_data, label = data_loader.next_batch()
+        batch_data, label , patient_ids  = data_loader.next_batch()
         print(batch_data.shape)
 
