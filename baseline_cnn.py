@@ -1,7 +1,7 @@
 from __future__ import print_function
 import numpy as np
 import tensorflow as tf
-from load_data import DataLoad
+from utils.load_data import DataLoad
 
 flags = tf.app.flags
 flags.DEFINE_integer("width", 128, "width")
@@ -54,20 +54,20 @@ with tf.device('/gpu:0'):
 
   # Variables.
   layer1_weights = tf.Variable(tf.truncated_normal(
-    [filter_depth, filter_height, filter_width, in_channels, layer1_channels], stddev=0.1))
+    [filter_depth, filter_height, filter_width, in_channels, layer1_channels], stddev=1.0))
   layer1_biases = tf.Variable(tf.zeros([layer1_channels]))
 
   layer2_weights = tf.Variable(tf.truncated_normal(
-    [filter_depth, filter_height, filter_width, layer1_channels, layer2_channels], stddev=0.1))
-  layer2_biases = tf.Variable(tf.constant(1.0, shape=[layer2_channels]))
+    [filter_depth, filter_height, filter_width, layer1_channels, layer2_channels], stddev=1.0))
+  layer2_biases = tf.Variable(tf.constant(0.0, shape=[layer2_channels]))
 
   layer3_weights = tf.Variable(tf.truncated_normal(
-    [in_depth // 4 * in_height // 4 * in_width // 4 * layer2_channels, num_hidden], stddev=0.1))
-  layer3_biases = tf.Variable(tf.constant(1.0, shape=[num_hidden]))
+    [in_depth // 4 * in_height // 4 * in_width // 4 * layer2_channels, num_hidden], stddev=1.0))
+  layer3_biases = tf.Variable(tf.constant(0.0, shape=[num_hidden]))
 
   layer4_weights = tf.Variable(tf.truncated_normal(
     [num_hidden, num_labels], stddev=0.1))
-  layer4_biases = tf.Variable(tf.constant(1.0, shape=[num_labels]))
+  layer4_biases = tf.Variable(tf.constant(0.0, shape=[num_labels]))
 
 
   # Model.
@@ -97,7 +97,7 @@ with tf.device('/gpu:0'):
   # Optimizer.
   optimizer = tf.train.AdamOptimizer(0.03)
   grads = optimizer.compute_gradients(loss)
-  capped_gvs = [(tf.clip_by_value(grad, -10., 10.), var) for grad, var in grads]
+  capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in grads]
   train_op = optimizer.apply_gradients(capped_gvs)
 
   # Prediction
@@ -105,7 +105,7 @@ with tf.device('/gpu:0'):
 
 
 # Training
-num_epochs = 1
+num_epochs = 20
 sess_config = tf.ConfigProto()
 sess_config.gpu_options.allow_growth = True
 sess_config.log_device_placement=False
