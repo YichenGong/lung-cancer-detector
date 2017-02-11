@@ -6,8 +6,9 @@ from load_data import DataLoad
 flags = tf.app.flags
 flags.DEFINE_integer("width", 128, "width")
 flags.DEFINE_integer("height", 128, "height")
-flags.DEFINE_integer("layers", 100, "layers")
-flags.DEFINE_integer("batch_size", 5, "batch size")
+flags.DEFINE_integer("layers", 128, "layers")
+flags.DEFINE_integer("batch_size", 20, "batch size")
+flags.DEFINE_integer("num_process", 1, "process number")
 flags.DEFINE_bool("is_train", True, "is train")
 flags.DEFINE_string("data_type", "stage1", "sample or stage1")
 config = flags.FLAGS
@@ -16,7 +17,10 @@ def expand_last_dim(*input_data):
   res = []
   for in_data in input_data:
     res.append(np.expand_dims(in_data, axis=len(in_data.shape)))
-  return res
+  if len(res) == 1:
+    return res[0]
+  else:
+    return res
 
 def conv3d(input_data, w, stride):
   return tf.nn.conv3d(input_data, w, strides=stride, padding='SAME')
@@ -88,12 +92,12 @@ with tf.device('/gpu:0'):
 
   logits = model(tf_dataset)
   # Prediction
-  loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf_labels, logits=logits))
+  loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits, tf_labels))
 
   # Optimizer.
-  optimizer = tf.train.GradientDescentOptimizer(0.05)
+  optimizer = tf.train.AdamOptimizer(0.03)
   grads = optimizer.compute_gradients(loss)
-  capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in grads]
+  capped_gvs = [(tf.clip_by_value(grad, -10., 10.), var) for grad, var in grads]
   train_op = optimizer.apply_gradients(capped_gvs)
 
   # Prediction
@@ -120,7 +124,8 @@ with tf.Session(config=sess_config) as session:
       train_data, train_label = expand_last_dim(train_data, train_label)
 
       feed_dict = {tf_dataset: train_data, tf_labels: train_label}
-      _, l = session.run([train_op, loss], feed_dict=feed_dict)
+      _, l, preds = session.run([train_op, loss, prediction], feed_dict=feed_dict)
+      print('labels: preds \n %s' % np.concatenate((train_label, preds), axis=1))
       print('Mini-batch loss: %f' % l)
 
 
@@ -133,10 +138,10 @@ with tf.Session(config=sess_config) as session:
       valid_data, valid_label = expand_last_dim(valid_data, valid_label)
 
       feed_dict = {tf_dataset: valid_data, tf_labels: valid_label}
-      l = session.run([loss], feed_dict=feed_dict)
+      l = session.run(loss, feed_dict=feed_dict)
       batch_size = valid_data.shape[0]
-      total_loss += l * batch_size
-      count += batch_size
+      total_loss = total_loss + l * batch_size
+      count = count + batch_size
 
     valid_loss = total_loss / count
     print('Validation loss is: %f', valid_loss)
@@ -146,16 +151,16 @@ with tf.Session(config=sess_config) as session:
   data_loader.test()
   pred_dict = {}
   while data_loader.has_next_batch():
-    test_data, _, test_id = expand_last_dim(data_loader.next_batch())
+    test_data, _, test_id = data_loader.next_batch()
     test_data = expand_last_dim(test_data)
-
+    
     feed_dict = {tf_dataset : test_data}
-    preds = session.run([prediction], feed_dict=feed_dict)
-    for i in range(len(test_data.shape[0])):
+    preds = session.run(prediction, feed_dict=feed_dict)
+    for i in range(test_data.shape[0]):
       pred_dict[test_id[i]] = preds[i]
 
   # TODO: write the predictions to file.
-  print("Now update this part.")
+  print("Now update csv")
 
 
 
