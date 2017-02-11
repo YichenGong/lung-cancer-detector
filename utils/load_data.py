@@ -88,8 +88,8 @@ class DataLoad():
         else:
             self.test_mode = True
         self.current_idx = 0
-        self.num_patients = len(self.train_ids)
-        self.read_idx = list(np.random.permutation(self.num_patients))
+        self.num_patients = len(self.pids)
+        self.pids = list(np.random.permutation(self.pids))
 
 
     # def single_process_task(self, patient_id, data_type):
