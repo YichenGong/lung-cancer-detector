@@ -2,13 +2,17 @@ from __future__ import print_function
 import csv
 import numpy as np
 import tensorflow as tf
-from utils.load_data import DataLoad
+
+import sys
+sys.path.append('./utils')
+
+from load_data import DataLoad
 
 flags = tf.app.flags
 flags.DEFINE_integer("width", 128, "width")
 flags.DEFINE_integer("height", 128, "height")
 flags.DEFINE_integer("layers", 128, "layers")
-flags.DEFINE_integer("batch_size", 20, "batch size")
+flags.DEFINE_integer("batch_size", 10, "batch size")
 flags.DEFINE_integer("num_process", 1, "process number")
 flags.DEFINE_bool("is_train", True, "is train")
 flags.DEFINE_string("data_type", "stage1", "sample or stage1")
@@ -35,16 +39,16 @@ def pool(x, name):
                          name=name + "_MaxPool")
 
 # Parameters
-batchSize = 1
+batchSize = 10
 
-imageSize = final_size
+imageSize = (128, 128, 128)
 labelsSize = 1
 
 #Making the Model here
 
 #Make place for input
 labelsInput = tf.placeholder(shape=[batchSize, labelsSize],
-                            dtype=tf.int8,
+                            dtype=tf.float32,
                             name="InputLabels")
 
 imagesPlaceholder = tf.placeholder(shape=[batchSize, imageSize[0], imageSize[1], imageSize[2]],
@@ -78,10 +82,10 @@ flattened_vector = tf.reshape(hidden_Pool6, shape=[hidden_Pool6.get_shape()[0].v
                                                    hidden_Pool6.get_shape()[2].value *
                                                    hidden_Pool6.get_shape()[3].value])
 vector_expanded = tf.expand_dims(flattened_vector, 1)
-bring_back = tf.reshape(vector_expanded, shape=[2, -1, vector_expanded.get_shape()[2].value])
+bring_back = tf.reshape(vector_expanded, shape=[batchSize, -1, vector_expanded.get_shape()[2].value])
 added_around_instance = tf.reduce_sum(bring_back, 1)
 
-hidden_Dense1_weights = Weight([added_around_instance.get_shape()[1], 64], "hidden_Dense1")
+hidden_Dense1_weights = Weight([added_around_instance.get_shape()[1].value, 64], "hidden_Dense1")
 hidden_Dense1_bias = Bias([1, 64], "hidden_Dense1")
 
 output_Dense2_weights = Weight([64, labelsSize], "output")
