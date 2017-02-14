@@ -69,31 +69,26 @@ imagesPlaceholder = tf.placeholder(shape=[None, imageSize[0], imageSize[1], imag
 x_images = tf.reshape(imagesPlaceholder, [-1, imageSize[1], imageSize[2], 1])
 
 #convolution Layes
-hidden_Conv1 = tf.nn.relu(tf.contrib.layers.batch_norm(conv(x_images, [3, 3, 1, 4], "hidden_Conv1"), is_training=is_training))
+hidden_Conv1 = tf.nn.relu(tf.contrib.layers.batch_norm(conv(x_images, [3, 3, 1, 16], "hidden_Conv1"), is_training=is_training))
 hidden_Pool1 = pool(hidden_Conv1, "hidden_Conv1")
 
-hidden_Conv2 = tf.nn.relu(tf.contrib.layers.batch_norm(conv(hidden_Pool1, [3, 3, 4, 4], "hidden_Conv2"), is_training=is_training))
+hidden_Conv2 = tf.nn.relu(tf.contrib.layers.batch_norm(conv(hidden_Pool1, [3, 3, 16, 32], "hidden_Conv2"), is_training=is_training))
 hidden_Pool2 = pool(hidden_Conv2, "hidden_Conv2")
 
-hidden_Conv3 = tf.nn.relu(tf.contrib.layers.batch_norm(conv(hidden_Pool2, [3, 3, 4, 8], "hidden_Conv3"), is_training=is_training))
-hidden_Pool3 = pool(hidden_Conv3, "hidden_Conv2")
+hidden_Conv3 = tf.nn.relu(tf.contrib.layers.batch_norm(conv(hidden_Pool2, [3, 3, 32, 64], "hidden_Conv3"), is_training=is_training))
+#hidden_Pool3 = pool(hidden_Conv3, "hidden_Conv3")
 
-flattened_vector = tf.reshape(hidden_Pool3, shape=[-1, 
-                                                   hidden_Pool3.get_shape()[1].value * 
-                                                   hidden_Pool3.get_shape()[2].value *
-                                                   hidden_Pool3.get_shape()[3].value])
+hidden_Conv4 = tf.nn.relu(conv(hidden_Conv3, [3, 3, 64, 1], "hidden_Conv4"))
+
+flattened_vector = tf.reshape(hidden_Conv4, shape=[-1, 
+                                                   hidden_Conv4.get_shape()[1].value * 
+                                                   hidden_Conv4.get_shape()[2].value *
+                                                   hidden_Conv4.get_shape()[3].value])
 vector_expanded = tf.expand_dims(flattened_vector, 1)
 bring_back = tf.reshape(vector_expanded, shape=[-1, imageSize[0], vector_expanded.get_shape()[2].value])
 added_around_instance = tf.reduce_sum(bring_back, 1)
 
-hidden_Dense1_weights = Weight([added_around_instance.get_shape()[1].value, 64], "hidden_Dense1")
-hidden_Dense1_bias = Bias([1, 64], "hidden_Dense1")
-
-output_Dense2_weights = Weight([64, labelsSize], "output")
-output_Dense2_bias = Bias([1, labelsSize], "output")
-
-hidden = tf.nn.relu(tf.matmul(added_around_instance, hidden_Dense1_weights) + hidden_Dense1_bias)
-output = tf.matmul(hidden, output_Dense2_weights) + output_Dense2_bias
+output = tf.reduce_sum(added_around_instance, axis=1, keep_dims=True, name="GAP_output")
 
 loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(output, labelsInput))
 
