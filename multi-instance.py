@@ -11,7 +11,7 @@ flags = tf.app.flags
 flags.DEFINE_integer("width", 128, "width")
 flags.DEFINE_integer("height", 128, "height")
 flags.DEFINE_integer("layers", 128, "layers")
-flags.DEFINE_integer("batch_size", 32, "batch size")
+flags.DEFINE_integer("batch_size", 16, "batch size")
 flags.DEFINE_integer("num_process", 1, "process number")
 flags.DEFINE_bool("is_train", True, "is train")
 flags.DEFINE_string("data_type", "stage1", "sample or stage1")
@@ -34,7 +34,7 @@ def Bias(shape, name):
     return tf.Variable(name=name + "_Bias",
                       initial_value=tf.constant(shape=shape, value=0.0))
 
-def conv(x, convShape, name, strides=[1, 2, 2, 1]):
+def conv(x, convShape, name, strides=[1, 1, 1, 1]):
     w = Weight(convShape, name)
     b = Bias([convShape[3]], name)
     return (tf.nn.conv2d(input=x, filter=w, strides=strides,
@@ -57,11 +57,11 @@ labelsSize = 1
 #Make place for input
 is_training = tf.placeholder(tf.bool)
 
-labelsInput = tf.placeholder(shape=[batchSize, labelsSize],
+labelsInput = tf.placeholder(shape=[None, labelsSize],
                             dtype=tf.float32,
                             name="InputLabels")
 
-imagesPlaceholder = tf.placeholder(shape=[batchSize, imageSize[0], imageSize[1], imageSize[2], 1],
+imagesPlaceholder = tf.placeholder(shape=[None, imageSize[0], imageSize[1], imageSize[2], 1],
                                   dtype=tf.float32,
                                   name="InputImages")
 
@@ -78,12 +78,12 @@ hidden_Pool2 = pool(hidden_Conv2, "hidden_Conv2")
 hidden_Conv3 = tf.nn.relu(tf.contrib.layers.batch_norm(conv(hidden_Pool2, [3, 3, 4, 8], "hidden_Conv3"), is_training=is_training))
 hidden_Pool3 = pool(hidden_Conv3, "hidden_Conv2")
 
-flattened_vector = tf.reshape(hidden_Pool3, shape=[hidden_Pool3.get_shape()[0].value, 
+flattened_vector = tf.reshape(hidden_Pool3, shape=[-1, 
                                                    hidden_Pool3.get_shape()[1].value * 
                                                    hidden_Pool3.get_shape()[2].value *
                                                    hidden_Pool3.get_shape()[3].value])
 vector_expanded = tf.expand_dims(flattened_vector, 1)
-bring_back = tf.reshape(vector_expanded, shape=[batchSize, -1, vector_expanded.get_shape()[2].value])
+bring_back = tf.reshape(vector_expanded, shape=[-1, imageSize[0], vector_expanded.get_shape()[2].value])
 added_around_instance = tf.reduce_sum(bring_back, 1)
 
 hidden_Dense1_weights = Weight([added_around_instance.get_shape()[1].value, 64], "hidden_Dense1")
@@ -112,7 +112,7 @@ prediction = tf.sigmoid(output)
 num_epochs = 50
 sess_config = tf.ConfigProto()
 sess_config.gpu_options.allow_growth = True
-sess_config.log_device_placement=True
+sess_config.log_device_placement=False
 sess_config.allow_soft_placement=True
 
 with tf.Session(config=sess_config) as session:
