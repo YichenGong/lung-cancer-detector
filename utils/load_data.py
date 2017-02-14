@@ -63,8 +63,14 @@ class DataLoad():
         return self.current_idx < len(self.pids)
 
 
-    def train(self):
-        self.pids = self.train_ids
+    def train(self, equal_distribution=False):
+        if equal_distribution:
+            pos_id = [item for item in self.train_ids if self.labels[item] == 1]
+            neg_id = [item for item in self.train_ids if self.labels[item] == 0]
+            neg_id = list(np.random.permutation(neg_id))
+            self.pids = np.append(pos_id, neg_id[:len(pos_id)])
+        else:
+            self.pids = self.train_ids
         self.reset(mode="train")
 
 
