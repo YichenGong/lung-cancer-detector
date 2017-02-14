@@ -11,7 +11,7 @@ flags = tf.app.flags
 flags.DEFINE_integer("width", 128, "width")
 flags.DEFINE_integer("height", 128, "height")
 flags.DEFINE_integer("layers", 128, "layers")
-flags.DEFINE_integer("batch_size", 16, "batch size")
+flags.DEFINE_integer("batch_size", 32, "batch size")
 flags.DEFINE_integer("num_process", 1, "process number")
 flags.DEFINE_bool("is_train", True, "is train")
 flags.DEFINE_string("data_type", "stage1", "sample or stage1")
@@ -34,7 +34,7 @@ def Bias(shape, name):
     return tf.Variable(name=name + "_Bias",
                       initial_value=tf.constant(shape=shape, value=0.0))
 
-def conv(x, convShape, name, strides=[1, 1, 1, 1]):
+def conv(x, convShape, name, strides=[1, 2, 2, 1]):
     w = Weight(convShape, name)
     b = Bias([convShape[3]], name)
     return (tf.nn.conv2d(input=x, filter=w, strides=strides,
