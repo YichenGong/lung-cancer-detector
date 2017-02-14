@@ -97,17 +97,17 @@ with tf.device('/gpu:0'):
 
     conv11 = conv3d(data, layer11_weights, conv_stride)
     conv11 = tf.contrib.layers.batch_norm(conv11, is_training=phase)
-    conv11 = tf.Print(conv11, [tf.reduce_max(conv11), tf.reduce_min(conv11)], message='conv11:')
+   # conv11 = tf.Print(conv11, [tf.reduce_max(conv11), tf.reduce_min(conv11)], message='conv11:')
     conv11 = tf.nn.relu(conv11 + layer11_biases)
     conv12 = conv3d(conv11, layer12_weights, conv_stride)
     conv12 = tf.contrib.layers.batch_norm(conv12, is_training=phase)
-    conv12 = tf.Print(conv12, [tf.reduce_max(conv12), tf.reduce_min(conv12)], message='conv12:')
+   # conv12 = tf.Print(conv12, [tf.reduce_max(conv12), tf.reduce_min(conv12)], message='conv12:')
     conv12 = tf.nn.relu(conv12 + layer12_biases)
     pool1 = max_pool3d(conv12, 2)
 
     conv2 = conv3d(pool1, layer2_weights, conv_stride)
     conv2 = tf.contrib.layers.batch_norm(conv2, is_training=phase)
-    conv2 = tf.Print(conv2, [tf.reduce_max(conv2), tf.reduce_min(conv2)], message='conv2:')
+   # conv2 = tf.Print(conv2, [tf.reduce_max(conv2), tf.reduce_min(conv2)], message='conv2:')
     conv2 = tf.nn.relu(conv2 + layer2_biases)
     pool2 = max_pool3d(conv2, 2)
 
@@ -117,8 +117,8 @@ with tf.device('/gpu:0'):
     hidden = tf.matmul(reshape, layer3_weights) + layer3_biases
     hidden = tf.contrib.layers.batch_norm(hidden, is_training=phase)
     hidden = tf.nn.relu(hidden)
-    hidden = tf.Print(hidden, [tf.reduce_max(layer3_weights), tf.reduce_min(layer3_weights)], message='hidden layer weights:') 
-    hidden = tf.Print(hidden, [tf.reduce_max(hidden), tf.reduce_min(hidden)], message='hidden:')
+   # hidden = tf.Print(hidden, [tf.reduce_max(layer3_weights), tf.reduce_min(layer3_weights)], message='hidden layer weights:') 
+   # hidden = tf.Print(hidden, [tf.reduce_max(hidden), tf.reduce_min(hidden)], message='hidden:')
     return tf.matmul(hidden, layer4_weights) + layer4_biases
 
   logits = model(tf_dataset, is_training)
