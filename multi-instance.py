@@ -34,7 +34,7 @@ def Bias(shape, name):
     return tf.Variable(name=name + "_Bias",
                       initial_value=tf.constant(shape=shape, value=0.0))
 
-def conv(x, convShape, name, strides=[1, 1, 1, 1]):
+def conv(x, convShape, name, strides=[1, 2, 2, 1]):
     w = Weight(convShape, name)
     b = Bias([convShape[3]], name)
     return (tf.nn.conv2d(input=x, filter=w, strides=strides,
@@ -43,7 +43,7 @@ def conv(x, convShape, name, strides=[1, 1, 1, 1]):
 
 def pool(x, name):
     return tf.nn.max_pool(value=x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1],
-                         padding='SAME',
+                         padding='VALID',
                          name=name + "_MaxPool")
 
 # Parameters
@@ -57,11 +57,11 @@ labelsSize = 1
 #Make place for input
 is_training = tf.placeholder(tf.bool)
 
-labelsInput = tf.placeholder(shape=[batchSize, labelsSize],
+labelsInput = tf.placeholder(shape=[None, labelsSize],
                             dtype=tf.float32,
                             name="InputLabels")
 
-imagesPlaceholder = tf.placeholder(shape=[batchSize, imageSize[0], imageSize[1], imageSize[2], 1],
+imagesPlaceholder = tf.placeholder(shape=[None, imageSize[0], imageSize[1], imageSize[2], 1],
                                   dtype=tf.float32,
                                   name="InputImages")
 
@@ -78,21 +78,12 @@ hidden_Pool2 = pool(hidden_Conv2, "hidden_Conv2")
 hidden_Conv3 = tf.nn.relu(tf.contrib.layers.batch_norm(conv(hidden_Pool2, [3, 3, 4, 8], "hidden_Conv3"), is_training=is_training))
 hidden_Pool3 = pool(hidden_Conv3, "hidden_Conv2")
 
-hidden_Conv4 = tf.nn.relu(tf.contrib.layers.batch_norm(conv(hidden_Pool3, [3, 3, 8, 8], "hidden_Conv4"), is_training=is_training))
-hidden_Pool4 = pool(hidden_Conv4, "hidden_Conv4")
-
-hidden_Conv5 = tf.nn.relu(tf.contrib.layers.batch_norm(conv(hidden_Pool4, [3, 3, 8, 16], "hidden_Conv5"), is_training=is_training))
-hidden_Pool5 = pool(hidden_Conv5, "hidden_Conv5")
-
-hidden_Conv6 = tf.nn.relu(tf.contrib.layers.batch_norm(conv(hidden_Pool5, [3, 3, 16, 16], "hidden_Conv6"), is_training=is_training))
-hidden_Pool6 = pool(hidden_Conv6, "hidden_Conv6")
-
-flattened_vector = tf.reshape(hidden_Pool6, shape=[hidden_Pool6.get_shape()[0].value, 
-                                                   hidden_Pool6.get_shape()[1].value * 
-                                                   hidden_Pool6.get_shape()[2].value *
-                                                   hidden_Pool6.get_shape()[3].value])
+flattened_vector = tf.reshape(hidden_Pool3, shape=[-1, 
+                                                   hidden_Pool3.get_shape()[1].value * 
+                                                   hidden_Pool3.get_shape()[2].value *
+                                                   hidden_Pool3.get_shape()[3].value])
 vector_expanded = tf.expand_dims(flattened_vector, 1)
-bring_back = tf.reshape(vector_expanded, shape=[batchSize, -1, vector_expanded.get_shape()[2].value])
+bring_back = tf.reshape(vector_expanded, shape=[-1, imageSize[0], vector_expanded.get_shape()[2].value])
 added_around_instance = tf.reduce_sum(bring_back, 1)
 
 hidden_Dense1_weights = Weight([added_around_instance.get_shape()[1].value, 64], "hidden_Dense1")
@@ -107,7 +98,7 @@ output = tf.matmul(hidden, output_Dense2_weights) + output_Dense2_bias
 loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(output, labelsInput))
 
 # Optimizer.
-optimizer = tf.train.AdamOptimizer(learning_rat=0.03, beta1=0.5)
+optimizer = tf.train.AdamOptimizer(learning_rate=0.03, beta1=0.5)
 grads = optimizer.compute_gradients(loss)
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 with tf.control_dependencies(update_ops):
@@ -121,6 +112,7 @@ prediction = tf.sigmoid(output)
 num_epochs = 50
 sess_config = tf.ConfigProto()
 sess_config.gpu_options.allow_growth = True
+sess_config.log_device_placement=False
 sess_config.allow_soft_placement=True
 
 with tf.Session(config=sess_config) as session:
@@ -138,7 +130,7 @@ with tf.Session(config=sess_config) as session:
 
       feed_dict = {imagesPlaceholder: train_data, labelsInput: train_label, is_training: True}
       _, l, preds = session.run([train_op, loss, prediction], feed_dict=feed_dict)
-      print('labels: preds \n %s' % np.concatenate((train_label, preds), axis=1))
+      #print('labels: preds \n %s' % np.concatenate((train_label, preds), axis=1))
       print('Mini-batch loss: %f' % l)
 
 
