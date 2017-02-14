@@ -108,3 +108,5 @@ data/sample/images/
 sync.sh
 
 .DS_Store
+
+visualization.py

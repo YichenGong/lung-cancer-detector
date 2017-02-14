@@ -29,6 +29,31 @@ def conv3d(input_data, w, stride):
 def max_pool3d(input_data, depth_stride):
   return tf.nn.max_pool3d(input_data, [1, depth_stride, 2, 2, 1], [1, depth_stride, 2, 2, 1], padding='SAME')
 
+def conv_bn_relu(input, kernel_shape, stride, bias_shape, is_training):
+  weights = tf.get_variable("weights", kernel_shape, initializer=tf.random_normal_initializer())
+  biases = tf.get_variable("biases", bias_shape, initializer=tf.constant_initializer(0.0))
+
+  conv = tf.nn.conv3d(input, weights, strides=stride, padding='SAME')
+  batch_norm = tf.contrib.layers.batch_norm(conv + biases, is_training=is_training)
+  relu = tf.nn.relu(batch_norm)
+  return relu
+
+def fc_bn_relu(input, weight_shape, bias_shape, is_training):
+  weights = tf.get_variable("weights", weight_shape, initializer=tf.random_normal_initializer())
+  biases = tf.get_variable("biases", bias_shape, initializer=tf.constant_initializer(0.0))
+
+  hidden = tf.matmul(input, weights)
+  batch_norm = tf.contrib.layers.batch_norm(hidden + biases, is_training=is_training)
+  relu = tf.nn.relu(batch_norm)
+  return relu
+
+def output_layer(input, weight_shape, bias_shape):
+  weights = tf.get_variable("weights", weight_shape, initializer=tf.random_normal_initializer())
+  biases = tf.get_variable("biases", bias_shape, initializer=tf.constant_initializer(0.0))
+  return tf.matmul(input, weights) + biases
+
+
+
 # Parameters
 in_depth = config.layers
 in_height = config.height
@@ -56,53 +81,48 @@ with tf.device('/gpu:0'):
   tf_labels = tf.placeholder(tf.float32, [None, num_labels])
 
   # Variables.
-  layer11_weights = tf.Variable(tf.truncated_normal(
-    [filter_depth, filter_height, filter_width, in_channels, layer11_channels], stddev=1.0))
-  layer11_biases = tf.Variable(tf.zeros([layer11_channels]))
+  # layer11_weights = tf.Variable(tf.truncated_normal(
+  #   [filter_depth, filter_height, filter_width, in_channels, layer11_channels], stddev=1.0))
+  # layer11_biases = tf.Variable(tf.zeros([layer11_channels]))
+  #
+  # layer12_weights = tf.Variable(tf.truncated_normal(
+  #   [filter_depth, filter_height, filter_width, layer11_channels, layer12_channels], stddev=1.0))
+  # layer12_biases = tf.Variable(tf.zeros([layer12_channels]))
+  #
+  # layer2_weights = tf.Variable(tf.truncated_normal(
+  #   [filter_depth, filter_height, filter_width, layer12_channels, layer2_channels], stddev=1.0))
+  # layer2_biases = tf.Variable(tf.constant(0.0, shape=[layer2_channels]))
 
-  layer12_weights = tf.Variable(tf.truncated_normal(
-    [filter_depth, filter_height, filter_width, layer11_channels, layer12_channels], stddev=1.0))
-  layer12_biases = tf.Variable(tf.zeros([layer12_channels]))
+  # layer3_weights = tf.Variable(tf.truncated_normal(
+  #   [in_depth // 4 * in_height // 4 * in_width // 4 * layer2_channels, num_hidden], stddev=1.0))
+  # layer3_biases = tf.Variable(tf.constant(0.0, shape=[num_hidden]))
 
-  layer2_weights = tf.Variable(tf.truncated_normal(
-    [filter_depth, filter_height, filter_width, layer12_channels, layer2_channels], stddev=1.0))
-  layer2_biases = tf.Variable(tf.constant(0.0, shape=[layer2_channels]))
-
-  layer3_weights = tf.Variable(tf.truncated_normal(
-    [in_depth // 4 * in_height // 4 * in_width // 4 * layer2_channels, num_hidden], stddev=1.0))
-  layer3_biases = tf.Variable(tf.constant(0.0, shape=[num_hidden]))
-
-  layer4_weights = tf.Variable(tf.truncated_normal(
-    [num_hidden, num_labels], stddev=0.5))
-  layer4_biases = tf.Variable(tf.constant(0.0, shape=[num_labels]))
+  # layer4_weights = tf.Variable(tf.truncated_normal(
+  #   [num_hidden, num_labels], stddev=0.5))
+  # layer4_biases = tf.Variable(tf.constant(0.0, shape=[num_labels]))
 
 
   # Model.
   def model(data, phase):
-    # normalize
-    max_v = tf.reduce_max(data)
-    data = tf.realdiv(data, max_v)
+    with tf.variable_scope("conv1"):
+      relu1 = conv_bn_relu(data, kernel_shape=[3,3,3,1,2], stride=[1,1,1,1,1], bias_shape=[2], is_training=phase)
 
-    conv11 = conv3d(data, layer11_weights, conv_stride)
-    conv11 = tf.contrib.layers.batch_norm(conv11, is_training=phase)
-    conv11 = tf.nn.relu(conv11 + layer11_biases)
-    conv12 = conv3d(conv11, layer12_weights, conv_stride)
-    conv12 = tf.contrib.layers.batch_norm(conv12, is_training=phase)
-    conv12 = tf.nn.relu(conv12 + layer12_biases)
-    pool1 = max_pool3d(conv12, 2)
+    with tf.variable_scope("conv2"):
+      relu2 = conv_bn_relu(relu1, kernel_shape=[3,3,3,2,4], stride=[1,1,1,1,1], bias_shape=[4], is_training=phase)
+      pool1 = max_pool3d(relu2, 2)
 
-    conv2 = conv3d(pool1, layer2_weights, conv_stride)
-    conv2 = tf.contrib.layers.batch_norm(conv2, is_training=phase)
-    conv2 = tf.nn.relu(conv2 + layer2_biases)
-    pool2 = max_pool3d(conv2, 2)
+    with tf.variable_scope("conv3"):
+      relu3 = conv_bn_relu(pool1, kernel_shape=[3,3,3,4,8], stride=[1,1,1,1,1], bias_shape=[8], is_training=phase)
+      pool2 = max_pool3d(relu3, 2)
 
-    shape = pool2.get_shape().as_list()
-    reshape = tf.reshape(pool2, [tf.shape(data)[0], shape[1] * shape[2] * shape[3] * shape[4]])
+    with tf.variable_scope("fc"):
+      shape = pool2.get_shape().as_list()
+      reshape = tf.reshape(pool2, [tf.shape(data)[0], shape[1] * shape[2] * shape[3] * shape[4]])
+      in_shape = [in_depth // 4 * in_height // 4 * in_width // 4 * layer2_channels, num_hidden]
+      hidden = fc_bn_relu(reshape, weight_shape=in_shape, bias_shape=[num_hidden], is_training=phase)
 
-    hidden = tf.matmul(reshape, layer3_weights) + layer3_biases
-    hidden = tf.contrib.layers.batch_norm(hidden, is_training=phase)
-    hidden = tf.nn.relu(hidden)
-    return tf.matmul(hidden, layer4_weights) + layer4_biases
+    with tf.variable_scope("output"):
+      return output_layer(hidden, weight_shape=[num_hidden, 1], bias_shape=[1])
 
   logits = model(tf_dataset, is_training)
   # Prediction
