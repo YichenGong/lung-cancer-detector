@@ -63,8 +63,8 @@ class DataLoad():
         return self.current_idx < len(self.pids)
 
 
-    def train(self, equal_distribution=False):
-        if equal_distribution:
+    def train(self, uniform_distribution=False):
+        if uniform_distribution:
             pos_id = [item for item in self.train_ids if self.labels[item] == 1]
             neg_id = [item for item in self.train_ids if self.labels[item] == 0]
             neg_id = list(np.random.permutation(neg_id))
