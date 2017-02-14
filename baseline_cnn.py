@@ -14,18 +14,6 @@ flags.DEFINE_bool("is_train", True, "is train")
 flags.DEFINE_string("data_type", "stage1", "sample or stage1")
 config = flags.FLAGS
 
-def sample_equally(data, labels):
-  num_positive = sum(labels==1)
-  num_negative = labels.shape[0] - num_positive
-  limit = min(num_positive, num_negative)
-  data_new = np.array([data[0]])
-  label_new = np.array([labels[0]])
-  for i in range(1, data.shape[0]):
-    if (labels[i] == 1 and sum(label_new==1) < limit) or (labels[i] == 0 and sum(label_new==0) < limit):
-      data_new = np.append(data_new, [data[i]], axis=0)
-      label_new = np.append(label_new, [labels[i]],axis=0)
-  return data_new, label_new
-
 def expand_last_dim(*input_data):
   res = []
   for in_data in input_data:
@@ -97,17 +85,14 @@ with tf.device('/gpu:0'):
 
     conv11 = conv3d(data, layer11_weights, conv_stride)
     conv11 = tf.contrib.layers.batch_norm(conv11, is_training=phase)
-   # conv11 = tf.Print(conv11, [tf.reduce_max(conv11), tf.reduce_min(conv11)], message='conv11:')
     conv11 = tf.nn.relu(conv11 + layer11_biases)
     conv12 = conv3d(conv11, layer12_weights, conv_stride)
     conv12 = tf.contrib.layers.batch_norm(conv12, is_training=phase)
-   # conv12 = tf.Print(conv12, [tf.reduce_max(conv12), tf.reduce_min(conv12)], message='conv12:')
     conv12 = tf.nn.relu(conv12 + layer12_biases)
     pool1 = max_pool3d(conv12, 2)
 
     conv2 = conv3d(pool1, layer2_weights, conv_stride)
     conv2 = tf.contrib.layers.batch_norm(conv2, is_training=phase)
-   # conv2 = tf.Print(conv2, [tf.reduce_max(conv2), tf.reduce_min(conv2)], message='conv2:')
     conv2 = tf.nn.relu(conv2 + layer2_biases)
     pool2 = max_pool3d(conv2, 2)
 
@@ -117,8 +102,6 @@ with tf.device('/gpu:0'):
     hidden = tf.matmul(reshape, layer3_weights) + layer3_biases
     hidden = tf.contrib.layers.batch_norm(hidden, is_training=phase)
     hidden = tf.nn.relu(hidden)
-   # hidden = tf.Print(hidden, [tf.reduce_max(layer3_weights), tf.reduce_min(layer3_weights)], message='hidden layer weights:') 
-   # hidden = tf.Print(hidden, [tf.reduce_max(hidden), tf.reduce_min(hidden)], message='hidden:')
     return tf.matmul(hidden, layer4_weights) + layer4_biases
 
   logits = model(tf_dataset, is_training)
@@ -153,10 +136,10 @@ with tf.Session(config=sess_config) as session:
   f = open('loss.log', 'w')
   for epoch in range(num_epochs):
     # Training
-    data_loader.train()
+    data_loader.train(equal_distribution=True)
     while data_loader.has_next_batch():
       train_data, train_label, _ = data_loader.next_batch()
-      train_data, train_label = sample_equally(np.array(train_data), np.array(train_label))
+      # train_data, train_label = sample_equally(np.array(train_data), np.array(train_label))
       train_data, train_label = expand_last_dim(train_data, train_label)
       print(train_data.shape)
 
