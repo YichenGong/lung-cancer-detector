@@ -1,5 +1,6 @@
 from __future__ import print_function
 import csv
+import os
 import numpy as np
 import tensorflow as tf
 from utils.load_data import DataLoad
@@ -8,11 +9,16 @@ flags = tf.app.flags
 flags.DEFINE_integer("width", 128, "width")
 flags.DEFINE_integer("height", 128, "height")
 flags.DEFINE_integer("layers", 128, "layers")
-flags.DEFINE_integer("batch_size", 80, "batch size")
+flags.DEFINE_integer("batch_size", 64, "batch size")
 flags.DEFINE_integer("num_process", 1, "process number")
 flags.DEFINE_bool("is_train", True, "is train")
 flags.DEFINE_string("data_type", "stage1", "sample or stage1")
 config = flags.FLAGS
+
+# Dir to save the log
+log_dir = "log/"
+model_dir = "cnn6-1/"
+os.makedirs(os.path.dirname(log_dir + model_dir), exist_ok=True)
 
 def expand_last_dim(*input_data):
   res = []
@@ -33,6 +39,7 @@ def conv_bn_relu(input, kernel_shape, stride, bias_shape, is_training):
   return relu
 
 def fc_bn_relu(input, weight_shape, bias_shape, is_training):
+  print(weight_shape)
   weights = tf.get_variable("weights", weight_shape, initializer=tf.random_normal_initializer(stddev=0.3))
   biases = tf.get_variable("biases", bias_shape, initializer=tf.constant_initializer(0.0))
 
@@ -51,7 +58,9 @@ def dropout(input, keep_prob=0.8):
 
 def flatten(input):
   shape = input.get_shape().as_list()
-  return tf.reshape(input, [tf.shape(input)[0], shape[1] * shape[2] * shape[3] * shape[4]])
+  batch_size = tf.shape(input)[0]
+  flattened_size = shape[1] * shape[2] * shape[3] * shape[4]
+  return tf.reshape(input, [batch_size, flattened_size])
 
 # Parameters
 chan0 = 1 # channels, 0 is input channel
@@ -61,8 +70,10 @@ chan3 = 32
 chan4 = 64
 chan5 = 128
 chan6 = 128
+chan7 = 256
 
-keep_prob = 0.8
+keep_prob1 = 0.8
+keep_prob2 = 0.6
 
 num_hidden = 128
 num_labels = 1
@@ -81,26 +92,31 @@ with tf.device('/gpu:0'):
       relu1 = conv_bn_relu(data, kernel_shape=[5,5,5,chan0,chan1], stride=[1,2,2,2,1], bias_shape=[chan1], is_training=phase)
 
     with tf.variable_scope("conv2"):
-      relu2 = conv_bn_relu(relu1, kernel_shape=[3,3,3,chan1,chan2], stride=[1,2,2,2,1], bias_shape=[chan2], is_training=phase)
+      relu2 = conv_bn_relu(relu1, kernel_shape=[3,3,3,chan1,chan2], stride=[1,1,1,1,1], bias_shape=[chan2], is_training=phase)
 
     with tf.variable_scope("conv3"):
       relu3 = conv_bn_relu(relu2, kernel_shape=[3,3,3,chan2,chan3], stride=[1,2,2,2,1], bias_shape=[chan3], is_training=phase)
  
     with tf.variable_scope("conv4"):
       relu4 = conv_bn_relu(relu3, kernel_shape=[3,3,3,chan3,chan4], stride=[1,1,1,1,1], bias_shape=[chan4], is_training=phase)
+      relu4 = dropout(relu4, keep_prob1)
 
     with tf.variable_scope("conv5"):
-      relu5 = conv_bn_relu(relu4, kernel_shape=[3,3,3,chan4,chan5], stride=[1,1,1,1,1], bias_shape=[chan5], is_training=phase)
-      relu5 = dropout(relu5, 0.8)      
+      relu5 = conv_bn_relu(relu4, kernel_shape=[3,3,3,chan4,chan5], stride=[1,2,2,2,1], bias_shape=[chan5], is_training=phase)
+      relu5 = dropout(relu5, keep_prob1)      
 
     with tf.variable_scope("conv6"):
       relu6 = conv_bn_relu(relu5, kernel_shape=[3,3,3,chan5,chan6], stride=[1,1,1,1,1], bias_shape=[chan6], is_training=phase)
-      relu6 = dropout(relu6, 0.8)
+      relu6 = dropout(relu6, keep_prob1)
+
+    with tf.variable_scope("conv7"):
+      relu7 = conv_bn_relu(relu6, kernel_shape=[3,3,3,chan6,chan7], stride=[1,2,2,2,1], bias_shape=[chan7], is_training=phase)
+      relu7 = dropout(relu7, keep_prob2)
 
     with tf.variable_scope("fc"):
-      reshape = flatten(relu6)
-      hidden = fc_bn_relu(reshape, weight_shape=[tf.shape(reshape)[1], num_hidden], bias_shape=[num_hidden], is_training=phase)
-      hidden = dropout(hidden, 0.8)       
+      reshape = flatten(relu7)
+      hidden = fc_bn_relu(reshape, weight_shape=[reshape.get_shape().as_list()[1], num_hidden], bias_shape=[num_hidden], is_training=phase)
+      hidden = dropout(hidden, keep_prob2)
 
     with tf.variable_scope("output"):
       return output_layer(hidden, weight_shape=[num_hidden, num_labels], bias_shape=[num_labels])
@@ -123,30 +139,32 @@ with tf.device('/gpu:0'):
 
 
 # Training
-num_epochs = 300
+num_epochs = 600
 sess_config = tf.ConfigProto()
 sess_config.gpu_options.allow_growth = True
 sess_config.log_device_placement=False
 sess_config.allow_soft_placement=True
 
+saver = tf.train.Saver()
+global_min_loss = 5.0 # initialize
+
 with tf.Session(config=sess_config) as session:
   tf.global_variables_initializer().run()
-  print('Initialized')
+  print("Initialized.")
   
   data_loader = DataLoad(config=config)
-  f = open('loss.log', 'w')
+  f = open(log_dir + model_dir + 'loss.log', 'w')
   for epoch in range(num_epochs):
+    print('epoch %d :' % epoch)
     # Training
     data_loader.train(uniform_distribution=True)
     while data_loader.has_next_batch():
       train_data, train_label, _ = data_loader.next_batch()
       train_data, train_label = expand_last_dim(train_data, train_label)
-      print(train_data.shape)
-
+      
       feed_dict = {tf_dataset: train_data, tf_labels: train_label, is_training: True}
       _, l, preds = session.run([train_op, loss, prediction], feed_dict=feed_dict)
-      print('labels: preds \n %s' % np.concatenate((train_label, preds), axis=1))
-      print('Mini-batch loss: %f' % l)
+      # print('labels: preds \n %s' % np.concatenate((train_label, preds), axis=1)) 
       f.write('train: %f\n' % l)
       f.flush()
 
@@ -165,25 +183,37 @@ with tf.Session(config=sess_config) as session:
       count = count + batch_size
 
     valid_loss = total_loss / count
-    print('Validation loss is: %f' % valid_loss)
     f.write('valid: %f\n' %  l)
     f.flush()
+    if valid_loss < global_min_loss:
+      # Saves the model and update global min loss
+      print('update global min loss to: %f' % valid_loss)
+      saver.save(session, log_dir + model_dir + 'model.ckpt')
+      global_min_loss = valid_loss
 
   f.close()
   # Test predictions
   data_loader.test()
   pred_dict = {}
-  while data_loader.has_next_batch():
-    test_data, _, test_id = data_loader.next_batch()
-    test_data = expand_last_dim(test_data)
+  # Restore best model
+  ckpt = tf.train.get_checkpoint_state(log_dir + model_dir)
+  print('checkpoint found: %s' % ckpt)
+  print('checkpoint path:%s' % ckpt.model_checkpoint_path)
+  if ckpt and ckpt.model_checkpoint_path:
+    saver.restore(session, ckpt.model_checkpoint_path)
+    print('model restored.')
+  
+    while data_loader.has_next_batch():
+      test_data, _, test_id = data_loader.next_batch()
+      test_data = expand_last_dim(test_data)
     
-    feed_dict = {tf_dataset : test_data, is_training: False}
-    preds = session.run(prediction, feed_dict=feed_dict)
-    for i in range(test_data.shape[0]):
-      pred_dict[test_id[i]] = preds[i][0]
+      feed_dict = {tf_dataset : test_data, is_training: False}
+      preds = session.run(prediction, feed_dict=feed_dict)
+      for i in range(test_data.shape[0]):
+        pred_dict[test_id[i]] = preds[i][0]
 
   print("Save submission to submission_backup.csv")
-  with open('submission_backup.csv', 'w') as f:
+  with open(log_dir + model_dir + 'submission_backup.csv', 'w') as f:
     writer = csv.writer(f)
     # write the header
     for row in {'id':'cancer'}.items():
