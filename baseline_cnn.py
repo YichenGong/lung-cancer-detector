@@ -46,6 +46,12 @@ def output_layer(input, weight_shape, bias_shape):
   biases = tf.get_variable("biases", bias_shape, initializer=tf.constant_initializer(0.0))
   return tf.matmul(input, weights) + biases
 
+def dropout(input, keep_prob=0.8):
+  return tf.nn.dropout(input, keep_prob=keep_prob, name='Dropout')
+
+def flatten(input):
+  shape = input.get_shape().as_list()
+  return tf.reshape(input, [tf.shape(input)[0], shape[1] * shape[2] * shape[3] * shape[4]])
 
 # Parameters
 chan0 = 1 # channels, 0 is input channel
@@ -55,6 +61,8 @@ chan3 = 32
 chan4 = 64
 chan5 = 128
 chan6 = 128
+
+keep_prob = 0.8
 
 num_hidden = 128
 num_labels = 1
@@ -80,18 +88,19 @@ with tf.device('/gpu:0'):
  
     with tf.variable_scope("conv4"):
       relu4 = conv_bn_relu(relu3, kernel_shape=[3,3,3,chan3,chan4], stride=[1,1,1,1,1], bias_shape=[chan4], is_training=phase)
-    
+
     with tf.variable_scope("conv5"):
       relu5 = conv_bn_relu(relu4, kernel_shape=[3,3,3,chan4,chan5], stride=[1,1,1,1,1], bias_shape=[chan5], is_training=phase)
+      relu5 = dropout(relu5, 0.8)      
 
     with tf.variable_scope("conv6"):
       relu6 = conv_bn_relu(relu5, kernel_shape=[3,3,3,chan5,chan6], stride=[1,1,1,1,1], bias_shape=[chan6], is_training=phase)
+      relu6 = dropout(relu6, 0.8)
 
     with tf.variable_scope("fc"):
-      shape = relu6.get_shape().as_list()
-      flattened_size = shape[1] * shape[2] * shape[3] * shape[4]
-      reshape = tf.reshape(relu6, [tf.shape(data)[0], flattened_size])
-      hidden = fc_bn_relu(reshape, weight_shape=[flattened_size, num_hidden], bias_shape=[num_hidden], is_training=phase)
+      reshape = flatten(relu6)
+      hidden = fc_bn_relu(reshape, weight_shape=[tf.shape(reshape)[1], num_hidden], bias_shape=[num_hidden], is_training=phase)
+      hidden = dropout(hidden, 0.8)       
 
     with tf.variable_scope("output"):
       return output_layer(hidden, weight_shape=[num_hidden, num_labels], bias_shape=[num_labels])
@@ -114,7 +123,7 @@ with tf.device('/gpu:0'):
 
 
 # Training
-num_epochs = 30
+num_epochs = 300
 sess_config = tf.ConfigProto()
 sess_config.gpu_options.allow_growth = True
 sess_config.log_device_placement=False
