@@ -182,7 +182,7 @@ with tf.Session(config=sess_config) as session:
       count = count + batch_size
 
     valid_loss = total_loss / count
-    f.write('valid: %f\n' %  l)
+    f.write('valid: %f\n' %  valid_loss)
     f.flush()
     if valid_loss < global_min_loss:
       # Saves the model and update global min loss

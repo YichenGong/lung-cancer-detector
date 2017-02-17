@@ -9,7 +9,7 @@ flags = tf.app.flags
 flags.DEFINE_integer("width", 128, "width")
 flags.DEFINE_integer("height", 128, "height")
 flags.DEFINE_integer("layers", 128, "layers")
-flags.DEFINE_integer("batch_size", 64, "batch size")
+flags.DEFINE_integer("batch_size", 16, "batch size")
 flags.DEFINE_integer("num_process", 1, "process number")
 flags.DEFINE_bool("is_train", True, "is train")
 flags.DEFINE_string("data_type", "stage1", "sample or stage1")
@@ -17,7 +17,7 @@ config = flags.FLAGS
 
 # Dir to save the log
 log_dir = "log/"
-model_dir = "cnn6-1/"
+model_dir = "cnn10-1/"
 os.makedirs(os.path.dirname(log_dir + model_dir), exist_ok=True)
 
 def expand_last_dim(*input_data):
@@ -38,7 +38,7 @@ def conv_bn_relu(input, kernel_shape, stride, bias_shape, is_training):
   relu = tf.nn.relu(batch_norm)
   return relu
 
-def fc_bn_relu(input, weight_shape, bias_shape, is_training):
+def fc_bn_relu(input, weight_shape, bias_shape, is_training=False):
   print(weight_shape)
   weights = tf.get_variable("weights", weight_shape, initializer=tf.random_normal_initializer(stddev=0.3))
   biases = tf.get_variable("biases", bias_shape, initializer=tf.constant_initializer(0.0))
@@ -53,8 +53,9 @@ def output_layer(input, weight_shape, bias_shape):
   biases = tf.get_variable("biases", bias_shape, initializer=tf.constant_initializer(0.0))
   return tf.matmul(input, weights) + biases
 
-def dropout(input, keep_prob=0.8):
-  return tf.nn.dropout(input, keep_prob=keep_prob, name='Dropout')
+def dropout(input, keep_prob=0.8, is_training=False):
+  prob = tf.cond(is_training, lambda: tf.constant(keep_prob), lambda: tf.constant(1.0))
+  return tf.nn.dropout(input, keep_prob=prob, name='Dropout')
 
 def flatten(input):
   shape = input.get_shape().as_list()
@@ -64,13 +65,16 @@ def flatten(input):
 
 # Parameters
 chan0 = 1 # channels, 0 is input channel
-chan1 = 16
+chan1 = 8
 chan2 = 16
-chan3 = 32
+chan3 = 16
 chan4 = 64
-chan5 = 128
+chan5 = 64
 chan6 = 128
-chan7 = 256
+chan7 = 128
+chan8 = 256
+chan9 = 256
+chan10 = 512
 
 keep_prob1 = 0.8
 keep_prob2 = 0.6
@@ -81,10 +85,12 @@ num_labels = 1
 # Graph
 with tf.device('/gpu:0'):
   # Input data.
-  is_training = tf.placeholder(tf.bool)
+ 
   tf_dataset = tf.placeholder(
     tf.float32, [None, config.layers, config.height, config.width, chan0])
   tf_labels = tf.placeholder(tf.float32, [None, num_labels])
+
+  is_training = tf.placeholder(tf.bool)
 
   # Model.
   def model(data, phase):
@@ -95,58 +101,67 @@ with tf.device('/gpu:0'):
       relu2 = conv_bn_relu(relu1, kernel_shape=[3,3,3,chan1,chan2], stride=[1,1,1,1,1], bias_shape=[chan2], is_training=phase)
 
     with tf.variable_scope("conv3"):
-      relu3 = conv_bn_relu(relu2, kernel_shape=[3,3,3,chan2,chan3], stride=[1,2,2,2,1], bias_shape=[chan3], is_training=phase)
+      relu3 = conv_bn_relu(relu2, kernel_shape=[3,3,3,chan2,chan3], stride=[1,1,1,1,1], bias_shape=[chan3], is_training=phase)
  
     with tf.variable_scope("conv4"):
-      relu4 = conv_bn_relu(relu3, kernel_shape=[3,3,3,chan3,chan4], stride=[1,1,1,1,1], bias_shape=[chan4], is_training=phase)
-      relu4 = dropout(relu4, keep_prob1)
+      relu4 = conv_bn_relu(relu3, kernel_shape=[3,3,3,chan3,chan4], stride=[1,2,2,2,1], bias_shape=[chan4], is_training=phase)
+      relu4 = dropout(relu4, keep_prob=keep_prob1, is_training=phase)
 
     with tf.variable_scope("conv5"):
-      relu5 = conv_bn_relu(relu4, kernel_shape=[3,3,3,chan4,chan5], stride=[1,2,2,2,1], bias_shape=[chan5], is_training=phase)
-      relu5 = dropout(relu5, keep_prob1)      
+      relu5 = conv_bn_relu(relu4, kernel_shape=[3,3,3,chan4,chan5], stride=[1,1,1,1,1], bias_shape=[chan5], is_training=phase)
+      relu5 = dropout(relu5, keep_prob=keep_prob1, is_training=phase)      
 
     with tf.variable_scope("conv6"):
       relu6 = conv_bn_relu(relu5, kernel_shape=[3,3,3,chan5,chan6], stride=[1,1,1,1,1], bias_shape=[chan6], is_training=phase)
-      relu6 = dropout(relu6, keep_prob1)
+      relu6 = dropout(relu6, keep_prob=keep_prob1, is_training=phase)
 
     with tf.variable_scope("conv7"):
       relu7 = conv_bn_relu(relu6, kernel_shape=[3,3,3,chan6,chan7], stride=[1,2,2,2,1], bias_shape=[chan7], is_training=phase)
-      relu7 = dropout(relu7, keep_prob2)
+      relu7 = dropout(relu7, keep_prob=keep_prob1, is_training=phase)
+
+    with tf.variable_scope("conv8"):
+      relu8 = conv_bn_relu(relu7, kernel_shape=[3,3,3,chan7,chan8], stride=[1,1,1,1,1], bias_shape=[chan8], is_training=phase)
+      relu8 = dropout(relu8, keep_prob=keep_prob1, is_training=phase)
+
+    with tf.variable_scope("conv9"):
+      relu9 = conv_bn_relu(relu8, kernel_shape=[3,3,3,chan8,chan9], stride=[1,1,1,1,1], bias_shape=[chan9], is_training=phase)
+      relu9 = dropout(relu9, keep_prob=keep_prob1, is_training=phase)
+
+    with tf.variable_scope("conv10"):
+      relu10 = conv_bn_relu(relu9, kernel_shape=[3,3,3,chan9,chan10], stride=[1,2,2,2,1], bias_shape=[chan10], is_training=phase)
+      relu10 = dropout(relu10, keep_prob=keep_prob2, is_training=phase)
+
 
     with tf.variable_scope("fc"):
-      reshape = flatten(relu7)
-      hidden = fc_bn_relu(reshape, weight_shape=[reshape.get_shape().as_list()[1], num_hidden], bias_shape=[num_hidden], is_training=phase)
-      hidden = dropout(hidden, keep_prob2)
+      reshape = flatten(relu10)
+      hidden = fc_bn_relu(reshape, weight_shape=[reshape.get_shape()[1].value, num_hidden], bias_shape=[num_hidden], is_training=phase)
+      hidden = dropout(hidden, keep_prob=keep_prob2, is_training=phase)
 
     with tf.variable_scope("output"):
       return output_layer(hidden, weight_shape=[num_hidden, num_labels], bias_shape=[num_labels])
 
   logits = model(tf_dataset, is_training)
-  # Prediction
-  loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits, tf_labels))
+  loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=tf_labels))
 
   # Optimizer.
-  optimizer = tf.train.AdamOptimizer(learning_rate=0.03, beta1=0.5)
-  grads = optimizer.compute_gradients(loss)
-# capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in grads]
   update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
   with tf.control_dependencies(update_ops):
     # Ensures that we execute the update_ops before performing the train_step, for batch_norm
-    train_op = optimizer.apply_gradients(grads)
+    train_op = tf.train.AdamOptimizer(learning_rate=0.01, beta1=0.7).minimize(loss)
 
   # Prediction
   prediction = tf.sigmoid(logits)
 
 
 # Training
-num_epochs = 600
+num_epochs = 950
 sess_config = tf.ConfigProto()
 sess_config.gpu_options.allow_growth = True
 sess_config.log_device_placement=False
 sess_config.allow_soft_placement=True
 
 saver = tf.train.Saver()
-global_min_loss = 5.0 # initialize
+global_min_loss = 20000000.0
 
 with tf.Session(config=sess_config) as session:
   tf.global_variables_initializer().run()
@@ -155,7 +170,6 @@ with tf.Session(config=sess_config) as session:
   data_loader = DataLoad(config=config)
   f = open(log_dir + model_dir + 'loss.log', 'w')
   for epoch in range(num_epochs):
-    print('epoch %d :' % epoch)
     # Training
     data_loader.train(uniform_distribution=True)
     while data_loader.has_next_batch():
@@ -183,8 +197,9 @@ with tf.Session(config=sess_config) as session:
       count = count + batch_size
 
     valid_loss = total_loss / count
-    f.write('valid: %f\n' %  l)
+    f.write('valid: %f\n' %  valid_loss)
     f.flush()
+    print('epoch[%d] valid loss: %f'% (epoch, valid_loss))
     if valid_loss < global_min_loss:
       # Saves the model and update global min loss
       print('update global min loss to: %f' % valid_loss)
