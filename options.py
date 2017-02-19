@@ -2,7 +2,7 @@
 import argparse
 
 def parse():
-	parser = argparse.ArgumentParser()
+	parser = argparse.ArgumentParser(prog="Lung Cancer Detector")
 
 	parser.add_argument("model", help="Model to run", type=str)
 	parser.add_argument("-d", "--data", help="Dataloader file", type=str, default="stage1")
