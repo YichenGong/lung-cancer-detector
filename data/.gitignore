@@ -1,5 +1,6 @@
 #Data to not be uploaded
 *.csv
+*.pick
 
 #Remove password/other files
 *.txt
