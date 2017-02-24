@@ -1,0 +1,1 @@
+This directory will contain pre-processed data in their respective subdirectories. For eg: ./sample/D\_H\_W\/ will contain images from sample dataset with Depth **D**, Width **W** and Height **H** with optional modification if done else it would be empty.

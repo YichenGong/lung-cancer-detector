@@ -1,5 +1,14 @@
-#Data to not be uploaded
+#Luna-16 dataset
+*.mhd
+*.raw
+
+#Kaggle dataset
 *.csv
+*.dcm
+
+#Pickled objects
+*.pick
+*.pkl
 
 #Remove password/other files
 *.txt
