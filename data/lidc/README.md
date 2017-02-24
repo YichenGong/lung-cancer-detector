@@ -1,0 +1,10 @@
+## Lung Image Database Consortium image collection (LIDC-IDRI)
+
+Contains the [Lung Image Database Consortium image collection (LIDC-IDRI)](https://wiki.cancerimagingarchive.net/display/Public/LIDC-IDRI)
+
+#### The format is as follows:
+* **XMLs** directory contains the XML files extracted from [here](https://wiki.cancerimagingarchive.net/download/attachments/3539039/LIDC-XML-only.tar.gz?version=1&modificationDate=1360694838194&api=v2). The XMl file descriptions can be obtained from the links [1](https://wiki.cancerimagingarchive.net/download/attachments/3539039/LIDC_XML_Documentation_1_Jan_2009.doc?version=1&modificationDate=1319224566057&api=v2), [2](https://wiki.cancerimagingarchive.net/download/attachments/3539039/voi%20array.xsd?version=1&modificationDate=1319224566040&api=v2), [3](https://wiki.cancerimagingarchive.net/download/attachments/3539039/annotated_xml_file_Mar%202010.rtf?version=1&modificationDate=1319224566198&api=v2), [4](https://wiki.cancerimagingarchive.net/download/attachments/3539039/LIDC_Reader_Instructions_pub.doc?version=1&modificationDate=1319224566165&api=v2)
+
+* **studies** contains the patient-wise studies downloaded using the application available [here](https://wiki.cancerimagingarchive.net/download/attachments/1966254/TCIA_LIDC-IDRI_06-22-2015.jnlp?version=2&modificationDate=1450816658631&api=v2)
+
+* the current directory itself contains CSV files provided in the following links (csv generated from excel format): [1](https://wiki.cancerimagingarchive.net/download/attachments/3539039/lidc-idri%20nodule%20counts%20%286-23-2015%29.xlsx?version=1&modificationDate=1435085651880&api=v2), [2](https://wiki.cancerimagingarchive.net/download/attachments/3539039/tcia-diagnosis-data-2012-04-20.xls?version=1&modificationDate=1334930231098&api=v2), [3](http://www.via.cornell.edu/lidc/)

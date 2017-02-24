@@ -1,3 +1,6 @@
+#LIDC dataset
+*.xml
+
 #Luna-16 dataset
 *.mhd
 *.raw
