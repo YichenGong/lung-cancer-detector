@@ -1,21 +1,14 @@
 import csv
 import numpy as np
 import tensorflow as tf
+import options
+import importlib
 
-import sys
-sys.path.append('./utils')
+opt = options.parse()
 
-from load_data import DataLoad
-
-flags = tf.app.flags
-flags.DEFINE_integer("width", 128, "width")
-flags.DEFINE_integer("height", 128, "height")
-flags.DEFINE_integer("layers", 128, "layers")
-flags.DEFINE_integer("batch_size", 32, "batch size")
-flags.DEFINE_integer("num_process", 1, "process number")
-flags.DEFINE_bool("is_train", True, "is train")
-flags.DEFINE_string("data_type", "stage1", "sample or stage1")
-config = flags.FLAGS
+opt.data = 'stage1' #Defaulting to stage1 data
+dl = (importlib.import_module("dataloader." + opt.data)).get_data_loader()
+dl.load(opt)
 
 def expand_last_dim(*input_data):
   res = []
@@ -47,9 +40,9 @@ def pool(x, name):
                          name=name + "_MaxPool")
 
 # Parameters
-batchSize = config.batch_size
+batchSize = opt.batch
 
-imageSize = (128, 128, 128)
+imageSize = opt.size
 labelsSize = 1
 
 #Making the Model here
@@ -95,7 +88,7 @@ output_Dense2_bias = Bias([1, labelsSize], "output")
 hidden = tf.nn.relu(tf.matmul(added_around_instance, hidden_Dense1_weights) + hidden_Dense1_bias)
 output = tf.matmul(hidden, output_Dense2_weights) + output_Dense2_bias
 
-loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(output, labelsInput))
+loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=output, labels=labelsInput))
 
 # Optimizer.
 optimizer = tf.train.AdamOptimizer(learning_rate=0.03, beta1=0.5)
@@ -118,15 +111,12 @@ sess_config.allow_soft_placement=True
 with tf.Session(config=sess_config) as session:
   tf.global_variables_initializer().run()
   print('Initialized')
-  
-  data_loader = DataLoad(config=config)
 
   for epoch in range(num_epochs):
     # Training
-    data_loader.train()
-    while data_loader.has_next_batch():
-      train_data, train_label, _ = data_loader.next_batch()
-      train_data, train_label = expand_last_dim(train_data, train_label)
+    dl.train()
+    for x, y, _ in dl.batches():
+      train_data, train_label = expand_last_dim(x, y)
 
       feed_dict = {imagesPlaceholder: train_data, labelsInput: train_label, is_training: True}
       _, l, preds = session.run([train_op, loss, prediction], feed_dict=feed_dict)
@@ -135,12 +125,11 @@ with tf.Session(config=sess_config) as session:
 
 
     # Validation
-    data_loader.validation()
+    dl.validate()
     total_loss = 0
     count = 0
-    while data_loader.has_next_batch():
-      valid_data, valid_label, _ = data_loader.next_batch()
-      valid_data, valid_label = expand_last_dim(valid_data, valid_label)
+    for x, y, _ in dl.batches():
+      valid_data, valid_label = expand_last_dim(x, y)
 
       feed_dict = {imagesPlaceholder: valid_data, labelsInput: valid_label, is_training: False}
       l = session.run(loss, feed_dict=feed_dict)
@@ -153,11 +142,10 @@ with tf.Session(config=sess_config) as session:
 
 
   # Test predictions
-  data_loader.test()
+  dl.test()
   pred_dict = {}
-  while data_loader.has_next_batch():
-    test_data, _, test_id = data_loader.next_batch()
-    test_data = expand_last_dim(test_data)
+  for x, _, test_id in dl.batches():
+    test_data = expand_last_dim(x)
     
     feed_dict = {imagesPlaceholder : test_data, is_training: False}
     preds = session.run(prediction, feed_dict=feed_dict)
