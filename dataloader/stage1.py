@@ -66,14 +66,14 @@ class Stage1Kaggle:
 		print("Pre-processing: Done!")
 
 	def train(self):
-		train_size = math.ceil((1.0 - self._val) * len(self._train_set))
+		train_size = int(math.ceil((1.0 - self._val) * len(self._train_set)))
 		self._current_set_x = [s[0] for s in self._train_set[:train_size]]
 		self._current_set_y = [s[1] for s in self._train_set[:train_size]]
 
 		self._current_set_size = train_size
 
 	def validate(self):
-		train_size = math.ceil((1.0 - self._val) * len(self._train_set))
+		train_size = int(math.ceil((1.0 - self._val) * len(self._train_set)))
 		self._current_set_x = [s[0] for s in self._train_set[train_size:]]
 		self._current_set_y = [s[1] for s in self._train_set[train_size:]]
 
@@ -88,7 +88,7 @@ class Stage1Kaggle:
 	def _load_patient(self, patient):
 		return p.load(open(os.path.join(self._target_directory, patient + ".pick"), "rb"))
 
-	def get_next(self):
+	def batches(self):
 		self._current_pointer = 0
 
 		while self._current_pointer < self._current_set_size:
@@ -97,7 +97,7 @@ class Stage1Kaggle:
 
 			self._current_pointer += self._batch_size
 
-			yield np.stack([self._load_patient(s) for s in batch_x]), batch_y
+			yield np.stack([self._load_patient(s) for s in batch_x]), np.array(batch_y), batch_x
 
 	def _set_directories(self):
 		self._directory = "data/stage1/"

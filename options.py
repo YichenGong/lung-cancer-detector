@@ -4,7 +4,7 @@ import argparse
 def parse():
 	parser = argparse.ArgumentParser(prog="Lung Cancer Detector")
 
-	parser.add_argument("model", help="Model to run", type=str)
+	parser.add_argument("-model", help="Model to run", type=str, default="")
 	parser.add_argument("-d", "--data", help="Dataloader file", type=str, default="stage1")
 	parser.add_argument("-p", "--pre-process", help="Pre-processing hook to be applied to all input", type=str, default="")
 	parser.add_argument("-n", "--name", help="Name of the experiment to be suffixed on all outputs", type=str, default="")

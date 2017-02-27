@@ -53,7 +53,7 @@ def get_resampled(filepath, new_spacing=[1, 1, 1]):
 def get_resized(filepath, new_size):
 	image = get_image_HU(filepath)
 
-	resize_factor = [a/b for a,b in zip(new_size, image.shape)]
+	resize_factor = [a/float(b) for a,b in zip(new_size, image.shape)]
 	return nd.interpolation.zoom(image, resize_factor, mode='nearest')
 
 def plot_3D(image, threshold=-400):

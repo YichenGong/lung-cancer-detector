@@ -3,22 +3,20 @@ import csv
 import os
 import numpy as np
 import tensorflow as tf
-from utils.load_data import DataLoad
+import options
+import importlib
 
-flags = tf.app.flags
-flags.DEFINE_integer("width", 128, "width")
-flags.DEFINE_integer("height", 128, "height")
-flags.DEFINE_integer("layers", 128, "layers")
-flags.DEFINE_integer("batch_size", 16, "batch size")
-flags.DEFINE_integer("num_process", 1, "process number")
-flags.DEFINE_bool("is_train", True, "is train")
-flags.DEFINE_string("data_type", "stage1", "sample or stage1")
-config = flags.FLAGS
+opt = options.parse()
+
+opt.data = 'stage1' #Defaulting to stage1 data
+dl = (importlib.import_module("dataloader." + opt.data)).get_data_loader()
+dl.load(opt)
 
 # Dir to save the log
-log_dir = "log/"
+log_dir = "oldLogs/"
 model_dir = "cnn10-1/"
-os.makedirs(os.path.dirname(log_dir + model_dir), exist_ok=True)
+if not os.path.exists(log_dir + model_dir):
+	os.makedirs(os.path.dirname(log_dir + model_dir))
 
 def expand_last_dim(*input_data):
   res = []
@@ -87,7 +85,7 @@ with tf.device('/gpu:0'):
   # Input data.
  
   tf_dataset = tf.placeholder(
-    tf.float32, [None, config.layers, config.height, config.width, chan0])
+    tf.float32, [None, opt.size[0], opt.size[1], opt.size[2], chan0])
   tf_labels = tf.placeholder(tf.float32, [None, num_labels])
 
   is_training = tf.placeholder(tf.bool)
@@ -167,14 +165,12 @@ with tf.Session(config=sess_config) as session:
   tf.global_variables_initializer().run()
   print("Initialized.")
   
-  data_loader = DataLoad(config=config)
   f = open(log_dir + model_dir + 'loss.log', 'w')
   for epoch in range(num_epochs):
     # Training
-    data_loader.train(uniform_distribution=True)
-    while data_loader.has_next_batch():
-      train_data, train_label, _ = data_loader.next_batch()
-      train_data, train_label = expand_last_dim(train_data, train_label)
+    dl.train()
+    for x, y, _ in dl.batches():
+      train_data, train_label = expand_last_dim(x, y)
       
       feed_dict = {tf_dataset: train_data, tf_labels: train_label, is_training: True}
       _, l, preds = session.run([train_op, loss, prediction], feed_dict=feed_dict)
@@ -183,12 +179,11 @@ with tf.Session(config=sess_config) as session:
       f.flush()
 
     # Validation
-    data_loader.validation()
+    dl.validate()
     total_loss = 0
     count = 0
-    while data_loader.has_next_batch():
-      valid_data, valid_label, _ = data_loader.next_batch()
-      valid_data, valid_label = expand_last_dim(valid_data, valid_label)
+    for x, y, _ in dl.batches():
+      valid_data, valid_label = expand_last_dim(x, y)
 
       feed_dict = {tf_dataset: valid_data, tf_labels: valid_label, is_training: False}
       l = session.run(loss, feed_dict=feed_dict)
@@ -208,7 +203,7 @@ with tf.Session(config=sess_config) as session:
 
   f.close()
   # Test predictions
-  data_loader.test()
+  dl.test()
   pred_dict = {}
   # Restore best model
   ckpt = tf.train.get_checkpoint_state(log_dir + model_dir)
@@ -218,9 +213,8 @@ with tf.Session(config=sess_config) as session:
     saver.restore(session, ckpt.model_checkpoint_path)
     print('model restored.')
   
-    while data_loader.has_next_batch():
-      test_data, _, test_id = data_loader.next_batch()
-      test_data = expand_last_dim(test_data)
+    for x, _, test_id in dl.batches():
+      test_data = expand_last_dim(x)
     
       feed_dict = {tf_dataset : test_data, is_training: False}
       preds = session.run(prediction, feed_dict=feed_dict)
