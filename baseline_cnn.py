@@ -151,7 +151,7 @@ with tf.device('/gpu:0'):
 
 
 # Training
-num_epochs = 950
+num_epochs = opt.epochs
 sess_config = tf.ConfigProto()
 sess_config.gpu_options.allow_growth = True
 sess_config.log_device_placement=False

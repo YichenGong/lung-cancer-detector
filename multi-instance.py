@@ -8,7 +8,6 @@ opt = options.parse()
 
 opt.data = 'stage1' #Defaulting to stage1 data
 dl = (importlib.import_module("dataloader." + opt.data)).get_data_loader(opt)
-dl.load(opt)
 
 def expand_last_dim(*input_data):
   res = []
@@ -102,7 +101,7 @@ prediction = tf.sigmoid(output)
 
 
 # Training
-num_epochs = 200
+num_epochs = opt.epochs
 sess_config = tf.ConfigProto()
 sess_config.gpu_options.allow_growth = True
 sess_config.log_device_placement=False
