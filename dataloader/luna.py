@@ -72,10 +72,19 @@ class Luna16(BaseDataLoader):
 				if ext == ".mhd":
 					self._all_series.append((directory, self._extract_id(idstr)))
 
+	def _add_to_normalize(self, image):
+		mean = np.mean(image)
+		std = np.std(image)
+		self._mean = ((self._mean * self._count) + mean)/self._count
+		self._count += 1
+
+		if std > self._std:
+			self._std = std
+
 	def _pre_process(self, patient):
 		img, origins, spacings = lp.load_itk_image(os.path.join(patient[0], self._file_name(patient[1])))
-		print(img.shape)
-		exit()
+		self._add_to_normalize(img)
+		return (img, origins, spacings)
 
 	def _pre_process_all(self):
 		if self._pre_processed_exists():
@@ -88,7 +97,10 @@ class Luna16(BaseDataLoader):
 		size = len(self._all_series)
 		for idx, patient in enumerate(self._all_series):
 			print(patient[1], str(idx+1) + "/" + str(size))
-			pickle.dump(self._pre_process(patient), open(os.path.join(self._target_directory, patient[1] + ".pick")), protocol=2)
+			p.dump(self._pre_process(patient), open(os.path.join(self._target_directory, patient[1] + ".pick")), protocol=2)
+
+		print("Mean = ", self._mean, ", STD = ", self._std)
+		p.dump((self._mean, self._std), open(os.path.join(self._target_directory, "norm_parameters.pick")), protocol=2)
 
 		print("Pre-processing Done!")
 
@@ -106,8 +118,12 @@ class Luna16(BaseDataLoader):
 		return True
 
 	def _load(self):
-		self._size = self._config.size
-		self._original_size = self._config.original
+		self._mean = 0
+		self._std = 0
+		self._count = 0
+		#self._size = self._config.size #Does not work in size config
+		#Only works with original size
+		self._original_size = True #As all the images are already of the same size
 		self._padded = self._config.padded_images
 		self._batch_size = self._config.batch
 		self._no_val = self._config.no_validation
