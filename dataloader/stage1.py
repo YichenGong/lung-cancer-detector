@@ -115,12 +115,12 @@ class Stage1Kaggle(BaseDataLoader):
 			yield np.stack([self._load_patient(s) for s in batch_x]), np.array(batch_y), batch_x
 
 	def _set_directories(self):
-		self._directory = "data/" + self._directory_root + "/"
+		self._directory = "data/" + self._get_directory()
 		if self._original_size:
-			self._target_directory = "data/preprocessed/" + self._directory_root + "/original"
+			self._target_directory = "data/preprocessed/" + self._get_directory() + "/original"
 		else:
-			self._target_directory = "data/preprocessed/stage1/" + \
-					str(self._size[0]) + "_" + str(self._size[1]) + "_" + str(self._size[2])
+			self._target_directory = "data/preprocessed/" + self._get_directory() + "/" \
+					+ str(self._size[0]) + "_" + str(self._size[1]) + "_" + str(self._size[2])
 	
 	def _get_directory(self):
 		return "stage1"
