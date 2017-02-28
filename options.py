@@ -16,6 +16,7 @@ def parse():
 	parser.add_argument("-b", "--batch", help="Batch size", type=int, default=32)
 	parser.add_argument("--threads", help="Number of threads", type=int, default=1)
 	parser.add_argument("-s", "--size", help="Size of images DEPTH * HEIGHT * WIDTH", nargs=3, type=int, default=[128, 128, 128])
+	parser.add_argument("--original", help="Use original size of the images", action="store_true")
 	parser.add_argument("--seed", help="Random Generator Seed", type=int, default=0)
 
 	# Loader specific options

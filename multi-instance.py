@@ -7,7 +7,7 @@ import importlib
 opt = options.parse()
 
 opt.data = 'stage1' #Defaulting to stage1 data
-dl = (importlib.import_module("dataloader." + opt.data)).get_data_loader()
+dl = (importlib.import_module("dataloader." + opt.data)).get_data_loader(opt)
 dl.load(opt)
 
 def expand_last_dim(*input_data):
@@ -115,7 +115,7 @@ with tf.Session(config=sess_config) as session:
   for epoch in range(num_epochs):
     # Training
     dl.train()
-    for x, y, _ in dl.batches():
+    for x, y, _ in dl.data_iter():
       train_data, train_label = expand_last_dim(x, y)
 
       feed_dict = {imagesPlaceholder: train_data, labelsInput: train_label, is_training: True}
@@ -128,7 +128,7 @@ with tf.Session(config=sess_config) as session:
     dl.validate()
     total_loss = 0
     count = 0
-    for x, y, _ in dl.batches():
+    for x, y, _ in dl.data_iter():
       valid_data, valid_label = expand_last_dim(x, y)
 
       feed_dict = {imagesPlaceholder: valid_data, labelsInput: valid_label, is_training: False}
@@ -144,7 +144,7 @@ with tf.Session(config=sess_config) as session:
   # Test predictions
   dl.test()
   pred_dict = {}
-  for x, _, test_id in dl.batches():
+  for x, _, test_id in dl.data_iter():
     test_data = expand_last_dim(x)
     
     feed_dict = {imagesPlaceholder : test_data, is_training: False}

@@ -5,6 +5,9 @@ import pandas as pd
 import numpy as np
 
 class SampleKaggle(stage1.Stage1Kaggle):
+	def _get_directory(self):
+		return "sample"
+
 	def _check_sample_exists(self, patient):
 		return os.path.exists(os.path.join(self._directory, patient))
 
@@ -29,10 +32,5 @@ class SampleKaggle(stage1.Stage1Kaggle):
 
 		print("Loading datasets: Done!")
 
-	def _set_directories(self):
-		self._directory = "data/sample/"
-		self._target_directory = "data/preprocessed/sample/" + \
-				str(self._size[0]) + "_" + str(self._size[1]) + "_" + str(self._size[2])
-
-def get_data_loader():
-	return SampleKaggle()
+def get_data_loader(config):
+	return SampleKaggle(config)

@@ -3,10 +3,15 @@ import pandas as pd
 import pickle as p
 import os
 import math
+from dataloader.base_dataloader import BaseDataLoader
 
 import utils.dicom_processor as dp
 
-class Stage1Kaggle:
+class Stage1Kaggle(BaseDataLoader):
+	def __init__(self, config):
+		super(Stage1Kaggle, self).__init__(config)
+		self._load()
+
 	def _load_sets(self):
 		print("Loading datasets")
 
@@ -52,20 +57,30 @@ class Stage1Kaggle:
 		if not(os.path.exists(self._target_directory)):
 			os.makedirs(self._target_directory)
 
-		for patient in self._train_set:
-			print("Pre-processing patient: ", patient[0])
-			rescaled_image = dp.get_resized(os.path.join(self._directory + patient[0]), self._size)
-			#Save the rescaled image to target directory
-			p.dump(rescaled_image, open(os.path.join(self._target_directory, patient[0] + ".pick"), "wb"), protocol=2)
+		size = len(self._train_set)
+		for idx, patient in enumerate(self._train_set):
+			print("Pre-processing patient: ", patient[0], str(idx+1) + "/" + str(size))
+			if self._original_size:
+				image = dp.get_image_HU(os.path.join(self._directory + patient[0]))
+			else:
+				image = dp.get_resized(os.path.join(self._directory + patient[0]), self._size)
+			p.dump(image, open(os.path.join(self._target_directory, patient[0] + ".pick"), "wb"), protocol=2)
 
-		for patient in self._test_set:
-			print("Pre-processing patient: ", patient)
-			rescaled_image = dp.get_resized(os.path.join(self._directory + patient), self._size)
-			p.dump(rescaled_image, open(os.path.join(self._target_directory, patient + ".pick"), "wb"), protocol=2)
+		size = len(self._test_set)
+		for idx, patient in enumerate(self._test_set):
+			print("Pre-processing patient: ", patient, str(idx+1) + "/" + str(size))
+			if self._original_size:
+				image = dp.get_image_HU(os.path.join(self._directory + patient))
+			else:
+				image = dp.get_resized(os.path.join(self._directory + patient), self._size)
+			p.dump(image, open(os.path.join(self._target_directory, patient + ".pick"), "wb"), protocol=2)
 
 		print("Pre-processing: Done!")
 
-	def train(self):
+	def train(self, do_shuffle=True):
+		if do_shuffle:
+			self.shuffle()
+
 		train_size = int(math.ceil((1.0 - self._val) * len(self._train_set)))
 		self._current_set_x = [s[0] for s in self._train_set[:train_size]]
 		self._current_set_y = [s[1] for s in self._train_set[:train_size]]
@@ -88,7 +103,7 @@ class Stage1Kaggle:
 	def _load_patient(self, patient):
 		return p.load(open(os.path.join(self._target_directory, patient + ".pick"), "rb"))
 
-	def batches(self):
+	def data_iter(self):
 		self._current_pointer = 0
 
 		while self._current_pointer < self._current_set_size:
@@ -100,19 +115,27 @@ class Stage1Kaggle:
 			yield np.stack([self._load_patient(s) for s in batch_x]), np.array(batch_y), batch_x
 
 	def _set_directories(self):
-		self._directory = "data/stage1/"
-		self._target_directory = "data/preprocessed/stage1/" + \
-				str(self._size[0]) + "_" + str(self._size[1]) + "_" + str(self._size[2])
+		self._directory = "data/" + self._directory_root + "/"
+		if self._original_size:
+			self._target_directory = "data/preprocessed/" + self._directory_root + "/original"
+		else:
+			self._target_directory = "data/preprocessed/stage1/" + \
+					str(self._size[0]) + "_" + str(self._size[1]) + "_" + str(self._size[2])
+	
+	def _get_directory(self):
+		return "stage1"
 
-	def load(self, config):
-		self._size = config.size
-		self._padded = config.padded_images
-		self._batch_size = config.batch
-		self._no_val = config.no_validation
+	def _load(self):
+		self._directory_root = self._get_directory()
+		self._size = self._config.size
+		self._original_size = self._config.original
+		self._padded = self._config.padded_images
+		self._batch_size = self._config.batch
+		self._no_val = self._config.no_validation
 		if self._no_val:
 			self._val = 0
 		else:
-			self._val = config.validation_ratio
+			self._val = self._config.validation_ratio
 
 		self._train_set = []
 		self._test_set = []
@@ -128,5 +151,5 @@ class Stage1Kaggle:
 
 		self.train()
 
-def get_data_loader():
-	return Stage1Kaggle()
+def get_data_loader(config):
+	return Stage1Kaggle(config)

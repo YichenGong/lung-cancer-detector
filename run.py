@@ -27,8 +27,7 @@ random.seed(opt.seed)
 tf.set_random_seed(opt.seed)
 
 #Import the data loader
-dl = (importlib.import_module("dataloader." + opt.data)).get_data_loader()
-dl.load(opt)
+dl = (importlib.import_module("dataloader." + opt.data)).get_data_loader(opt)
 
 # for x, y in dl.get_next():
 # 	print(x.shape, len(y))

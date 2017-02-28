@@ -9,8 +9,7 @@ import importlib
 opt = options.parse()
 
 opt.data = 'stage1' #Defaulting to stage1 data
-dl = (importlib.import_module("dataloader." + opt.data)).get_data_loader()
-dl.load(opt)
+dl = (importlib.import_module("dataloader." + opt.data)).get_data_loader(opt)
 
 # Dir to save the log
 log_dir = "oldLogs/"
@@ -169,7 +168,7 @@ with tf.Session(config=sess_config) as session:
   for epoch in range(num_epochs):
     # Training
     dl.train()
-    for x, y, _ in dl.batches():
+    for x, y, _ in dl.data_iter():
       train_data, train_label = expand_last_dim(x, y)
       
       feed_dict = {tf_dataset: train_data, tf_labels: train_label, is_training: True}
@@ -182,7 +181,7 @@ with tf.Session(config=sess_config) as session:
     dl.validate()
     total_loss = 0
     count = 0
-    for x, y, _ in dl.batches():
+    for x, y, _ in dl.data_iter():
       valid_data, valid_label = expand_last_dim(x, y)
 
       feed_dict = {tf_dataset: valid_data, tf_labels: valid_label, is_training: False}
@@ -213,7 +212,7 @@ with tf.Session(config=sess_config) as session:
     saver.restore(session, ckpt.model_checkpoint_path)
     print('model restored.')
   
-    for x, _, test_id in dl.batches():
+    for x, _, test_id in dl.data_iter():
       test_data = expand_last_dim(x)
     
       feed_dict = {tf_dataset : test_data, is_training: False}
