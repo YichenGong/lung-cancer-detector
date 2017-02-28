@@ -75,7 +75,7 @@ class Luna16(BaseDataLoader):
 	def _add_to_normalize(self, image):
 		mean = np.mean(image)
 		std = np.std(image)
-		self._mean = ((self._mean * self._count) + mean)/self._count
+		self._mean = ((self._mean * self._count) + mean)/(self._count + 1)
 		self._count += 1
 
 		if std > self._std:
@@ -97,10 +97,10 @@ class Luna16(BaseDataLoader):
 		size = len(self._all_series)
 		for idx, patient in enumerate(self._all_series):
 			print(patient[1], str(idx+1) + "/" + str(size))
-			p.dump(self._pre_process(patient), open(os.path.join(self._target_directory, patient[1] + ".pick")), protocol=2)
+			p.dump(self._pre_process(patient), open(os.path.join(self._target_directory, patient[1] + ".pick"), "wb"), protocol=2)
 
 		print("Mean = ", self._mean, ", STD = ", self._std)
-		p.dump((self._mean, self._std), open(os.path.join(self._target_directory, "norm_parameters.pick")), protocol=2)
+		p.dump((self._mean, self._std), open(os.path.join(self._target_directory, "norm_parameters.pick"), "wb"), protocol=2)
 
 		print("Pre-processing Done!")
 
