@@ -86,8 +86,13 @@ class Luna16(BaseDataLoader):
 		self._add_to_normalize(img)
 		return (img, origins, spacings)
 
+	def _load_norm_parameters(self):
+		self._mean, self._std = p.load(open(os.path.join(self._target_directory, "norm_parameters.pick"), "rb"))
+
 	def _pre_process_all(self):
 		if self._pre_processed_exists():
+			self._load_norm_parameters()
+			print("Mean = ", self._mean, ", STD = ", self._std)
 			return
 
 		print("No pre-processed dataset found, pre-processing now...")
@@ -117,7 +122,45 @@ class Luna16(BaseDataLoader):
 		print("Found pre-processed datasets")
 		return True
 
+	def _construct_mask_values(self, ids):
+		mask_vals = {}
+		print("Creating Mask Values...")
+		size = len(self._annotations)
+		for idx, annotation in enumerate(self._annotations):
+			print(str(idx) + "/" + str(size))
+			series, z, y, x, d = annotation #Order as given in the tutorial for LUNA-16
+			r = d/2.0
+			img, o, s = p.load(open(os.path.join(self._target_directory, series + ".pick"), "rb"))
+			if series not in mask_vals:
+				mask_vals[series] = []
+			voxelCenter = lp.world_to_voxel_coord(np.array([x, y, z]), o, s)
+			x, y, z = voxelCenter
+			y = int(y)
+			z = int(z)
+			sliceRange = range(max(0, int(x - r/s[0])), int(x + r/s[0])) #1 so that we don't loose any information
+			for sliceIdx in sliceRange:
+				center = (sliceIdx, y, z)
+				radius = math.sqrt(max(0, r*r - ((s[0] * math.fabs(x - sliceIdx))**2)))
+				mask_vals[series].append((center, max(radius/s[1], radius/s[2])))
+		
+		print("Mask values created!")
+		return mask_vals
+
+	def _load_datasets(self):
+		if os.path.exists(os.path.join(self._target_directory, "nodule_info.pick")):
+			self._X, self._Y = p.load(open(os.path.join(self._directory, "nodule_info.pick"), "rb"))
+			return
+
+		
+		for patient in self._all_series:
+			self._X.append(patient[1])
+		
+		self._Y = self._construct_mask_values(self._X)
+
+		p.dump((self._X, self._Y), open(os.path.join(self._target_directory, "nodule_info.pick"), "wb"))
+
 	def _load(self):
+		self._voxel_width = 65 
 		self._mean = 0
 		self._std = 0
 		self._count = 0
@@ -143,6 +186,7 @@ class Luna16(BaseDataLoader):
 		self._set_directories()
 		self._load_data()
 		self._pre_process_all()
+		self._load_datasets()
 
 		# self.train()
 
