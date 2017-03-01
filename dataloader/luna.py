@@ -13,18 +13,20 @@ class Luna16(BaseDataLoader):
 		self._load()
 
 	def data_iter(self):
-		#a generator to go through the dataset in a loop
 		pass
 
 	def train(self, do_shuffle=True):
 		if do_shuffle:
 			self.shuffle()
-		#Go into training mode
-		pass
+		
+		train_size = int(math.ceil((1.0 - self._val) * len(self._X)))
+		self._current_set_x = self._X[:train_size]
+		self._current_set_size = train_size
 
 	def validate(self):
-		#Go into Validation mode
-		pass
+		train_size = int(math.ceil((1.0 - self._val) * len(self._X)))
+		self._current_set_x = self._X[train_size:]
+		self._current_set_size = len(self._current_set_x)
 
 	def test(self):
 		#Go into test mode
@@ -33,8 +35,7 @@ class Luna16(BaseDataLoader):
 		self.train()
 
 	def shuffle(self):
-		#Shuffle the dataset
-		pass
+		self._X = [self._X[i] for i in np.random.permutation(len(self._X))]
 
 	def _get_directory(self):
 		return "luna16"
@@ -125,6 +126,7 @@ class Luna16(BaseDataLoader):
 	def _construct_mask_values(self, ids):
 		mask_vals = {}
 		print("Creating Mask Values...")
+
 		size = len(self._annotations)
 		for idx, annotation in enumerate(self._annotations):
 			print(str(idx) + "/" + str(size))
@@ -132,16 +134,18 @@ class Luna16(BaseDataLoader):
 			r = d/2.0
 			img, o, s = p.load(open(os.path.join(self._target_directory, series + ".pick"), "rb"))
 			if series not in mask_vals:
-				mask_vals[series] = []
+				mask_vals[series] = {}
 			voxelCenter = lp.world_to_voxel_coord(np.array([x, y, z]), o, s)
 			x, y, z = voxelCenter
 			y = int(y)
 			z = int(z)
-			sliceRange = range(max(0, int(x - r/s[0])), int(x + r/s[0])) #1 so that we don't loose any information
+			sliceRange = range(max(0, int(x - r/s[0])), int(x + r/s[0] + 1)) #1 so that we don't loose any information
 			for sliceIdx in sliceRange:
-				center = (sliceIdx, y, z)
+				center = (z, y)
 				radius = math.sqrt(max(0, r*r - ((s[0] * math.fabs(x - sliceIdx))**2)))
-				mask_vals[series].append((center, max(radius/s[1], radius/s[2])))
+				if sliceIdx not in mask_vals[series]:
+					mask_vals[series][sliceIdx] = []
+				mask_vals[series][sliceIdx].append((center, max(radius/s[1], radius/s[2])))
 		
 		print("Mask values created!")
 		return mask_vals
@@ -150,7 +154,6 @@ class Luna16(BaseDataLoader):
 		if os.path.exists(os.path.join(self._target_directory, "nodule_info.pick")):
 			self._X, self._Y = p.load(open(os.path.join(self._directory, "nodule_info.pick"), "rb"))
 			return
-
 		
 		for patient in self._all_series:
 			self._X.append(patient[1])
@@ -164,7 +167,7 @@ class Luna16(BaseDataLoader):
 		self._mean = 0
 		self._std = 0
 		self._count = 0
-		#self._size = self._config.size #Does not work in size config
+		self._size = 512 #Does not work in size config
 		#Only works with original size
 		self._original_size = True #As all the images are already of the same size
 		self._padded = self._config.padded_images
@@ -179,8 +182,8 @@ class Luna16(BaseDataLoader):
 		self._Y = []
 
 		self._current_set_x = None
-		self._current_set_y = None
 		self._current_pointer = 0
+		self._current_pointer_internal = 0
 		self._current_set_size = 0
 
 		self._set_directories()
@@ -188,7 +191,7 @@ class Luna16(BaseDataLoader):
 		self._pre_process_all()
 		self._load_datasets()
 
-		# self.train()
+		self.train()
 
 def get_data_loader(config):
 	return Luna16(config)
