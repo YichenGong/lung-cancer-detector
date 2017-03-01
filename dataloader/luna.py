@@ -4,6 +4,7 @@ import pickle as p
 import os
 import math
 from dataloader.base_dataloader import BaseDataLoader
+import cv2 as cv
 
 import utils.luna16_processor as lp
 
@@ -12,8 +13,41 @@ class Luna16(BaseDataLoader):
 		super(Luna16, self).__init__(config)
 		self._load()
 
+	def _draw_masks(self, empty_array, idstr, slice_id):
+		if idstr in self._Y:
+			if slice_id in self._Y[idstr]:
+				circles = self._Y[idstr][slice_id]
+
+				for circle in circles:
+					cv2.circle(empty_array, circle[0], int(round(circle[1])), 255, -1)
+
+		return empty_array
+
 	def data_iter(self):
-		pass
+		self._current_pointer = 0
+
+		batch_X = batch_Y = []
+		counter = 0
+		
+		while self._current_pointer < self._current_set_size:
+			img, o, s = p.load(open(os.path.join(self._target_directory, 
+				self._X[self._current_pointer] + ".pick"), "rb"))
+			
+			for sliceIdx in range(img.shape[0]):
+				batch_X.append(img[sliceIdx])
+				batch_Y.append(self._draw_nodule_mask(np.zeros_like(img[sliceIdx]), 
+					self._X[self._current_pointer], sliceIdx))
+				count += 1
+
+				if count % self._batch_size == 0:
+					yield np.array(batch_X), np.array(batch_Y)
+					count = 0
+					batch_X = batch_Y = []
+
+			self._current_pointer += 1
+
+		if len(batch_X) > 0:
+			return np.array(batch_X), np.array(batch_Y)
 
 	def train(self, do_shuffle=True):
 		if do_shuffle:
@@ -132,7 +166,10 @@ class Luna16(BaseDataLoader):
 			print(str(idx) + "/" + str(size))
 			series, z, y, x, d = annotation #Order as given in the tutorial for LUNA-16
 			r = d/2.0
-			img, o, s = p.load(open(os.path.join(self._target_directory, series + ".pick"), "rb"))
+			try:
+				img, o, s = p.load(open(os.path.join(self._target_directory, series + ".pick"), "rb"))
+			except:
+				continue
 			if series not in mask_vals:
 				mask_vals[series] = {}
 			voxelCenter = lp.world_to_voxel_coord(np.array([x, y, z]), o, s)
@@ -183,7 +220,6 @@ class Luna16(BaseDataLoader):
 
 		self._current_set_x = None
 		self._current_pointer = 0
-		self._current_pointer_internal = 0
 		self._current_set_size = 0
 
 		self._set_directories()
