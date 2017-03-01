@@ -13,13 +13,13 @@ class Luna16(BaseDataLoader):
 		super(Luna16, self).__init__(config)
 		self._load()
 
-	def _draw_masks(self, empty_array, idstr, slice_id):
+	def _draw_nodule_mask(self, empty_array, idstr, slice_id):
 		if idstr in self._Y:
 			if slice_id in self._Y[idstr]:
 				circles = self._Y[idstr][slice_id]
 
 				for circle in circles:
-					cv2.circle(empty_array, circle[0], int(round(circle[1])), 255, -1)
+					cv.circle(empty_array, circle[0], int(round(circle[1])), 255, -1)
 
 		return empty_array
 
@@ -27,7 +27,7 @@ class Luna16(BaseDataLoader):
 		self._current_pointer = 0
 
 		batch_X = batch_Y = []
-		counter = 0
+		count = 0
 		
 		while self._current_pointer < self._current_set_size:
 			img, o, s = p.load(open(os.path.join(self._target_directory, 
@@ -47,7 +47,7 @@ class Luna16(BaseDataLoader):
 			self._current_pointer += 1
 
 		if len(batch_X) > 0:
-			return np.array(batch_X), np.array(batch_Y)
+			yield np.array(batch_X), np.array(batch_Y)
 
 	def train(self, do_shuffle=True):
 		if do_shuffle:
@@ -189,7 +189,7 @@ class Luna16(BaseDataLoader):
 
 	def _load_datasets(self):
 		if os.path.exists(os.path.join(self._target_directory, "nodule_info.pick")):
-			self._X, self._Y = p.load(open(os.path.join(self._directory, "nodule_info.pick"), "rb"))
+			self._X, self._Y = p.load(open(os.path.join(self._target_directory, "nodule_info.pick"), "rb"))
 			return
 		
 		for patient in self._all_series:
