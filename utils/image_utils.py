@@ -52,7 +52,7 @@ def elastic_transform_2d(img, alpha, sigma, random_mode=True, probability=0.5):
 	dx = nd.gaussian_filter((random_state.rand(img.shape) * 2 - 1), sigma, mode="constant", cval=0) * alpha
 	dy = nd.gaussian_filter((random_state.rand(img.shape) * 2 - 1), sigma, mode="constant", cval=0) * alpha
 
-	x, y = np.meshgrid(np.arange(shape[0]), np.arange(shape[1]), indexing='ij')
+	x, y = np.meshgrid(np.arange(img.shape[0]), np.arange(img.shape[1]), indexing='ij')
 	indices = np.reshape(x+dx, (-1, 1)), np.reshape(y+dy, (-1, 1))
 
 	return nd.map_coordinates(img, indices, order=1).reshape(img.shape)
