@@ -73,8 +73,21 @@ class Nodule:
 				self._props['texture'] = int(child.text)
 			elif child.tag.endswith("malignancy"):
 				self._props['malignancy'] = int(child.text)
-			
+	
+	def is_nodule(self):
+		return self._isNodule
 
+	def is_big_nodule(self):
+		return self._isBig
+
+	def get_roi(self):
+		return self._roi
+
+	def get_id(self):
+		return self._id
+
+	def get_characteristics(self):
+		return self._props
 
 	def __check_if_big_nodule(self):
 		if len(self._roi) == 1:
@@ -130,7 +143,7 @@ def parse_xml_header(headers):
 			else:
 				#There are only two types of reads!
 				print("Something different in header in header", header.text)
-		elif header.tag.endswith("StudyInstanceUID"):
+		elif header.tag.endswith("SeriesInstanceUid"):
 			#There are multiple kinds of UIDs available here
 			#We'll only store Study Instance UID
 			#If anything else is important, we'll update
@@ -152,7 +165,7 @@ def parse_xml(filepath):
 			'''
 			reading = parse_xml_reading(child)
 			if len(reading) > 0:
-				details['readings'].append(reading)
+				details['readings'].extend(reading)
 		else:
 			'''
 			It is a header
