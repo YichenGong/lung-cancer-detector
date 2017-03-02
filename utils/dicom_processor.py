@@ -3,6 +3,7 @@ import os
 import numpy as np
 import dicom
 import cv2 as cv
+import utils.image_utils as imu
 
 import scipy.ndimage as nd
 import matplotlib.pyplot as plt
@@ -79,13 +80,7 @@ def get_resized(filepath, new_size):
 	return get_resized_image(image, new_size)
 
 def get_resized_image(image, new_size):
-	if new_size[0] == -1:
-		#Resize 2D wise!
-		return np.array([cv.resize(image[idx], (new_size[1], new_size[2])) \
-			for idx in range(image.shape[0])])
-	else:
-		resize_factor = [a/float(b) for a,b in zip(new_size, image.shape)]
-		return nd.interpolation.zoom(image, resize_factor, mode='nearest')
+	return imu.resize_3d(image, new_size)
 
 def plot_3D(image, threshold=-400):
 	verts, faces = measure.marching_cubes(image, threshold)
