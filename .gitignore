@@ -4,6 +4,8 @@
 #Data files
 *.7z
 *.zip
+*.gz
+
 
 #Submission files and data labels
 #*.csv
@@ -108,5 +110,7 @@ data/sample/images/
 sync.sh
 
 .DS_Store
+
+*.jpg
 
 visualization.py
