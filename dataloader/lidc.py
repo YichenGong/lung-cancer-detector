@@ -1,3 +1,4 @@
+from __future__ import print_function
 import numpy as np
 import pandas as pd
 import pickle as p
@@ -56,7 +57,14 @@ class LIDCData(BaseDataLoader):
 			else:
 				resize = self._size
 
-			slices = dp.load_lidc_scan(os.path.join(path), resize)
+			try:
+				slices = dp.load_lidc_scan(os.path.join(path), resize)
+			except:
+				print("Error with ", path)
+				dp.load_lidc_scan(os.path.join(path), resize, print_details=True)
+				if name in self._nodule_info:
+					print("Nodules exist for this series")
+				continue
 			
 			p.dump(slices, 
 				open(os.path.join(self._target_directory, name + ".pick"), "wb"), 
@@ -117,8 +125,11 @@ class LIDCData(BaseDataLoader):
 			return
 		print("No pre-processed dataset found...")
 
-		self._pre_process_images()
+		if not(os.path.exists(self._target_directory)):
+			os.makedirs(self._target_directory)
+		
 		self._pre_process_XMLs()
+		self._pre_process_images()
 
 		print("Pre-processing Done!")
 

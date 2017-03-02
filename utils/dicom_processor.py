@@ -37,9 +37,16 @@ def get_slices_HU(slices):
 
 	return np.array(image, dtype=np.int16)
 
-def load_lidc_scan(filepath, resize=None):
+#TODO handle the different kind of scans too!
+def load_lidc_scan(filepath, resize=None, print_details=False):
 	slices = [dicom.read_file(filepath + '/' + s) for s in os.listdir(filepath)]
-	slices.sort(key=lambda x: int(x.ImagePositionPatient[2]))
+	if print_details:
+		print(slices[0])
+		print(len(slices))
+		print(filepath)
+		return
+
+	slices.sort(key=lambda x: x.ImagePositionPatient[2])
 
 	if resize:
 		image = get_slices_HU(slices)
@@ -74,8 +81,8 @@ def get_resized(filepath, new_size):
 def get_resized_image(image, new_size):
 	if new_size[0] == -1:
 		#Resize 2D wise!
-		return np.array([cv.resize(single_slice, (new_size[1], new_size[2])) \
-			for single_slice in scan])
+		return np.array([cv.resize(image[idx], (new_size[1], new_size[2])) \
+			for idx in range(image.shape[0])])
 	else:
 		resize_factor = [a/float(b) for a,b in zip(new_size, image.shape)]
 		return nd.interpolation.zoom(image, resize_factor, mode='nearest')
