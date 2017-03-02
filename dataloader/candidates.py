@@ -85,7 +85,7 @@ class CandidateDataLoader(BaseDataLoader):
 
     else:
       d = self.data[pid]
-      scan = dp.get_image_HU('{}/images/{}'.format(self.sample_dir, pid))
+      scan = dp.get_image_HU('{}/{}'.format(self.sample_dir, pid))
       result = []
 
       for i in range(k):
@@ -100,13 +100,13 @@ class CandidateDataLoader(BaseDataLoader):
     return result
 
   def split_dataset(self):
-    train_ids = pd.read_csv(self.stage1_dir + "stage1_labels.csv").id.tolist()
+    train_ids = pd.read_csv(self.data_dir + "stage1_labels.csv").id.tolist()
     random.shuffle(train_ids)
     split_point = int(len(train_ids) * self.validation_rate)
 
     train_ids = train_ids[split_point:]
     valid_ids = train_ids[:split_point]
-    test_ids = pd.read_csv(self.stage1_dir + "stage1_sample_submission.csv").id.tolist()
+    test_ids = pd.read_csv(self.data_dir + "stage1_sample_submission.csv").id.tolist()
 
     return train_ids, valid_ids, test_ids
 
