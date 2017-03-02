@@ -15,15 +15,47 @@ class LIDCData(BaseDataLoader):
 
 	def data_iter(self):
 		#a generator to go through the dataset in a loop
-		pass
+		current_pointer = 0
+
+		batch_X = batch_Y = []
+		count = 0
+		
+		while current_pointer < self._current_set_size:
+			(img, s, o, origShape) = p.load(open(os.path.join(self._target_directory, 
+				self._X[current_pointer] + ".pick"), "rb"))
+			
+			for sliceIdx in range(img.shape[0]):
+				batch_X.append(img[sliceIdx])
+				# TODO Create the correct mask here
+				#depending on the nodule info
+				batch_Y.append(np.zeros_like(img[sliceIdx]))
+				count += 1
+
+				if count % self._batch_size == 0:
+					yield np.array(batch_X), np.array(batch_Y)
+					count = 0
+					batch_X = batch_Y = []
+
+			current_pointer += 1
+
+		if len(batch_X) > 0:
+			yield np.array(batch_X), np.array(batch_Y)
 
 	def train(self, do_shuffle=True):
-		#Go into training mode
-		pass
+		if do_shuffle:
+			self.shuffle()
+
+		train_size = int(math.ceil((1.0 - self._val) * len(self._train_set)))
+		self._current_set_x = self._X[:train_size]
+		self._current_set_size = train_size
 
 	def validate(self):
-		#Go into Validation mode
-		pass
+		if do_shuffle:
+			self.shuffle()
+
+		train_size = int(math.ceil((1.0 - self._val) * len(self._train_set)))
+		self._current_set_x = self._X[train_size:]
+		self._current_set_size = len(self._current_set_x)
 
 	def test(self):
 		#No testing, only validation
@@ -31,7 +63,18 @@ class LIDCData(BaseDataLoader):
 
 	def shuffle(self):
 		#Shuffle the dataset
-		pass
+		self._X = [self._X[i] for i in np.random.permutation(len(self._X))]
+
+	def _create_datasets(self):
+		#XML dataset is already created.
+		#We just need to build a the list
+		#of patients we have
+		for name in os.listdir(self._target_directory):
+			root, ext = os.apth.splitext(name)
+			if root == "nodule_info" or root == "norm_para":
+				continue
+			else:
+				self._X.append(name)
 
 	def _studies_directory_iter(self):
 		for i in os.listdir(self._studies):
@@ -58,10 +101,10 @@ class LIDCData(BaseDataLoader):
 				resize = self._size
 
 			try:
-				slices = dp.load_lidc_scan(os.path.join(path), resize)
+				slices = dp.load_lidc_scan(path, resize)
 			except:
 				print("Error with ", path)
-				dp.load_lidc_scan(os.path.join(path), resize, print_details=True)
+				dp.load_lidc_scan(path, resize, print_details=True)
 				if name in self._nodule_info:
 					print("Nodules exist for this series")
 				continue
@@ -98,6 +141,14 @@ class LIDCData(BaseDataLoader):
 			protocol=2)
 		print("XMLs pre-processing completes...")
 
+	def _check_valid_dicom(self, path):
+		try:
+			slices = dp.load_lidc_scan(path)
+		except:
+			return False
+
+		return True
+
 	def _pre_process_exists(self):
 		if not(os.path.exists(self._target_directory) 
 			and os.path.isdir(self._target_directory)):
@@ -106,7 +157,8 @@ class LIDCData(BaseDataLoader):
 		#Check if all patients exists
 		for path, name in self._studies_directory_iter():
 			if not os.path.exists(os.path.join(self._target_directory, name + ".pick")):
-				return False
+				if self._check_valid_dicom(path):
+					return False
 
 		if not os.path.exists(os.path.join(self._target_directory, "nodule_info.pick")):
 			return False
@@ -158,8 +210,14 @@ class LIDCData(BaseDataLoader):
 		else:
 			self._val = self._config.validation_ratio
 
+		self._X = []
+
+		self._current_set_x = None
+		self._current_set_size = 0
+
 		self._set_directories()
 		self._pre_process()
+		self._create_datasets()
 
 		self.train()
 
