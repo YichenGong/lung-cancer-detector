@@ -71,7 +71,7 @@ class LIDCData(BaseDataLoader):
 		#of patients we have
 		for name in os.listdir(self._target_directory):
 			root, ext = os.apth.splitext(name)
-			if root == "nodule_info" or root == "norm_para":
+			if root == "nodule_info" or root == "norm_para" or root == "ignored_scans":
 				continue
 			else:
 				self._X.append(name)
@@ -110,6 +110,7 @@ class LIDCData(BaseDataLoader):
 
 				if not scan:
 					self._ignored_scans.append(name)
+					continue
 			except:
 				#If this error occurs, manual intervention 
 				#is required right now
@@ -188,6 +189,7 @@ class LIDCData(BaseDataLoader):
 
 	def _load_preprocessed_data(self):
 		self._nodule_info = p.load(open(os.path.join(self._target_directory, "nodule_info.pick"), "rb"))
+		self._ignored_scans = p.load(open(os.path.join(self._target_directory, "ignored_scans.pick"), "rb"))
 
 	def _pre_process(self):
 		if self._pre_process_exists():
