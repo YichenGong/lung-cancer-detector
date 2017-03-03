@@ -18,7 +18,7 @@ opt.diameter_mm = 30
 # Build graph
 #######################################################
 with tf.device('/gpu:0'):
-  chan = [1,4,8]
+  chan = [1,4,8,16]
   num_hidden = 64
   num_labels = 1
   num_nodules = opt.top_k
@@ -58,11 +58,15 @@ with tf.Session(config=sess_config) as session:
   for epoch in range(num_epochs):
     # Training
     dl.train()
+    print('switch to training')
     for train_data, train_label in dl.data_iter():
 
       feed_dict = {tf_dataset: train_data, tf_labels: train_label, is_training: True}
+      print('run the session now')
       _, l, preds = session.run([train_op, loss, prediction], feed_dict=feed_dict)
-      # print('labels: preds \n %s' % np.concatenate((train_label, preds), axis=1))
+      #print('labels: preds \n %s' % np.concatenate((train_label, preds), axis=1))
+      print('batch loss:{}'.format(l))   
+   
 
     # Validation
     dl.validate()
