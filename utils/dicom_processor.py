@@ -38,9 +38,31 @@ def get_slices_HU(slices):
 
 	return np.array(image, dtype=np.int16)
 
+def is_scan_processable(scan):
+	size = len(scan)
+	if size > 0:
+		typeOfScan = scan[0].SOPClassUID
+
+		#Ignoreing CR and DX scans
+		if typeOfScan == 'Digital X-Ray Image Storage - For Presentation':
+			return False
+		if typeOfScan == 'Computed Radiography Image Storage':
+			if size > 2:
+				print("Found radiography image with more than 2 slices")
+			return False
+	else:
+		return False
+
+	return True
+
 #TODO handle the different kind of scans too!
 def load_lidc_scan(filepath, resize=None, print_details=False):
 	slices = [dicom.read_file(filepath + '/' + s) for s in os.listdir(filepath)]
+
+	if not is_scan_processable(slices):
+		print(filepath)
+		return None
+
 	if print_details:
 		print(slices[0])
 		print(len(slices))

@@ -89,8 +89,13 @@ class LIDCData(BaseDataLoader):
 	def _pre_process_images(self):
 		print("Pre-processing images...")
 		
+		total_scans = sum(1 for i in self._studies_directory_iter())
+
+		count = 1
 		for path, name in self._studies_directory_iter():
-			print("Processing ", name)
+			print("{}/{}Processing ".format(count, total_scans), name)
+			count += 1
+
 			for s in os.listdir(path):
 				root, ext = os.path.splitext(s)
 				if ext != '.dcm':
@@ -101,24 +106,32 @@ class LIDCData(BaseDataLoader):
 				resize = self._size
 
 			try:
-				slices = dp.load_lidc_scan(path, resize)
+				scan = dp.load_lidc_scan(path, resize)
+
+				if not scan:
+					self._ignored_scans.append(name)
 			except:
+				#If this error occurs, manual intervention 
+				#is required right now
 				print("Error with ", path)
 				dp.load_lidc_scan(path, resize, print_details=True)
 				if name in self._nodule_info:
 					print("Nodules exist for this series")
 				continue
 			
-			p.dump(slices, 
+			p.dump(scan, 
 				open(os.path.join(self._target_directory, name + ".pick"), "wb"), 
 				protocol=2)
 
+		p.dump(self._ignored_scans, 
+			open(os.path.join(self._target_directory, "ignored_scans.pick"), "wb"),
+			protocol=2)
 		print("Image pre-processing complete!")
 
 	def _pre_process_XMLs(self):
 		print("Pre-processing XMLs...")
+		
 		nodule_info_list = lidc_xml_parser.load_xmls(self._xmls)
-
 		#Create a more sensible list for iteration
 		#over the dataset of nodules
 		self._nodule_info = {}
@@ -144,7 +157,13 @@ class LIDCData(BaseDataLoader):
 	def _check_valid_dicom(self, path):
 		try:
 			slices = dp.load_lidc_scan(path)
+			if not slices:
+				return False
 		except:
+			#Some unknown error occured in loading
+			#the dicom
+			#Manual intervention required
+			print("Some problem with path: ", path)
 			return False
 
 		return True
@@ -214,6 +233,8 @@ class LIDCData(BaseDataLoader):
 
 		self._current_set_x = None
 		self._current_set_size = 0
+
+		self._ignored_scans = []
 
 		self._set_directories()
 		self._pre_process()
