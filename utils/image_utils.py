@@ -70,7 +70,7 @@ def resize_3d(img, new_size):
 			return img
 	else:
 		resize_factor = [a/float(b) for a,b in zip(new_size, img.shape)]
-		if resize_factor = (1.0, 1.0, 1.0):
+		if resize_factor == (1.0, 1.0, 1.0):
 			return img
 			
 		return nd.interpolation.zoom(img, resize_factor, mode='nearest')
