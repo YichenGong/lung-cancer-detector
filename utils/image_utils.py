@@ -63,8 +63,14 @@ def resize_2d(img, new_size):
 def resize_3d(img, new_size):
 	if new_size[0] == -1:
 		#Resize 2D wise!
-		return np.array([cv.resize(img[idx], (new_size[1], new_size[2])) \
-			for idx in range(img.shape[0])])
+		if new_size[1] != img[0].shape[0] and new_size[2] != img[0].shape[1]:
+			return np.array([cv.resize(img[idx], (new_size[1], new_size[2])) \
+				for idx in range(img.shape[0])])
+		else:
+			return img
 	else:
 		resize_factor = [a/float(b) for a,b in zip(new_size, img.shape)]
+		if resize_factor = (1.0, 1.0, 1.0):
+			return img
+			
 		return nd.interpolation.zoom(img, resize_factor, mode='nearest')
