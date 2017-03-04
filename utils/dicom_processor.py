@@ -6,16 +6,12 @@ import cv2 as cv
 import utils.image_utils as imu
 
 import scipy.ndimage as nd
-import matplotlib.pyplot as plt
-
-from skimage import measure, morphology
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 #Functions inspired by https://www.kaggle.com/gzuidhof/data-science-bowl-2017/full-preprocessing-tutorial
 
 def load_scan(filepath):
 	slices = [dicom.read_file(filepath + '/' + s) for s in os.listdir(filepath)]
-	slices.sort(key=lambda x: int(x.ImagePositionPatient[2]))
+	slices.sort(key=lambda x: x.ImagePositionPatient[2])
 
 	try:
 		slice_thickness = np.abs(slices[0].ImagePositionPatient[2] - slices[1].ImagePositionPatient[2])
@@ -53,7 +49,6 @@ def is_scan_processable(scan):
 
 	return True
 
-#TODO handle the different kind of scans too!
 def load_lidc_scan(filepath, resize=None, print_details=False):
 	slices = [dicom.read_file(filepath + '/' + s) for s in os.listdir(filepath)]
 
@@ -101,20 +96,3 @@ def get_resized(filepath, new_size):
 
 def get_resized_image(image, new_size):
 	return imu.resize_3d(image, new_size)
-
-def plot_3D(image, threshold=-400):
-	verts, faces = measure.marching_cubes(image, threshold)
-
-	fig = plt.figure(figsize=(10, 10))
-	ax = fig.add_subplot(111, projection='3d')
-
-	mesh = Poly3DCollection(verts[faces], alpha=0.1)
-	face_color = [0.5, 0.5, 1]
-	mesh.set_facecolor(face_color)
-	ax.add_collection3d(mesh)
-
-	ax.set_xlim(0, image.shape[0])
-	ax.set_ylim(0, image.shape[1])
-	ax.set_zlim(0, image.shape[2])
-
-	plt.show()
