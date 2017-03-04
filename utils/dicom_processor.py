@@ -44,6 +44,8 @@ def is_scan_processable(scan):
 			return False
 		if typeOfScan == 'Computed Radiography Image Storage':
 			return False
+		if typeOfScan == 'Segmentation Storage':
+			return False
 	else:
 		return False
 
@@ -69,7 +71,7 @@ def load_lidc_scan(filepath, resize=None, print_details=False):
 	if resize:
 		image = get_resized_image(image, resize)
 
-	spacing = np.array([slices[0].SliceThickness] + slices[0].PixelSpacing, dtype=np.float32)
+	spacing = np.array(slices[0].PixelSpacing + [slices[0].SliceThickness], dtype=np.float32)
 	origin = np.array(slices[0].ImagePositionPatient)
 
 	return image, spacing, origin, origShape
@@ -96,3 +98,19 @@ def get_resized(filepath, new_size):
 
 def get_resized_image(image, new_size):
 	return imu.resize_3d(image, new_size)
+
+def world_to_voxel_coord(worldCoord, origin, spacing):
+	strectchedVoxelCoord = np.absolute(worldCoord - origin)
+	voxelCoord = strectchedVoxelCoord / spacing
+
+	return voxelCoord
+
+def normalize_planes(npzarray):
+	maxHU = 400
+	minHU = -1000
+
+	npzarray = (npzarray - minHU) / (maxHU - minHU)
+	npzarray[npzarray > 1] = 1
+	npzarray[npzarray < 0] = 0
+
+	return npzarray

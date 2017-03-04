@@ -4,14 +4,29 @@ import pandas as pd
 import pickle as p
 import os
 import math
+import cv2 as cv
 from dataloader.base_dataloader import BaseDataLoader
 
-from utils import dicom_processor as dp, lidc_xml_parser
+from utils import dicom_processor as dp, lidc_xml_parser, image_utils as imu
 
 class LIDCData(BaseDataLoader):
 	def __init__(self, config):
 		super(LIDCData, self).__init__(config)
 		self._load()
+
+	def _get_mask(self, scan, slide, series):
+		img, s, o, origShape = scan
+		mask = np.zeros((origShape[1], origShape[2]))
+		nodules = self._nodule_info[series]
+		for nodule in nodules:
+			iid, z, edges = nodule
+			z = int((z - o[2])/s[2])
+			if z == sliceIdx:
+				cv.fillPoly(mask, [edges], 255)
+
+		if img.shape[1] != origShape[1] or img.shape[2] != origShape[2]:
+			mask = imu.resize_2d(mask, (img.shape[1], img.shape[2]))
+		return mask
 
 	def data_iter(self):
 		#a generator to go through the dataset in a loop
@@ -26,9 +41,9 @@ class LIDCData(BaseDataLoader):
 			
 			for sliceIdx in range(img.shape[0]):
 				batch_X.append(img[sliceIdx])
-				# TODO Create the correct mask here
-				#depending on the nodule info
-				batch_Y.append(np.zeros_like(img[sliceIdx]))
+				batch_Y.append(self._get_mask((img, s, o, origShape), 
+					sliceIdx, 
+					self._X[current_pointer]))
 				count += 1
 
 				if count % self._batch_size == 0:
@@ -151,7 +166,7 @@ class LIDCData(BaseDataLoader):
 					for roi in nodule.get_roi():
 						z = roi.z
 						iid = roi.image_uid
-						vertices = [(edge.x, edge.y) for edge in roi.get_edges()]
+						vertices = np.array([(edge.x, edge.y) for edge in roi.get_edges()], np.int32).reshape((-1, 1, 2))
 						self._nodule_info[series].append((iid, z, vertices))
 
 		print("XMLs pre-processing completes...")

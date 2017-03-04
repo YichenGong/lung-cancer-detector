@@ -7,6 +7,7 @@ from dataloader.base_dataloader import BaseDataLoader
 import cv2 as cv
 
 import utils.luna16_processor as lp
+import utils.dicom_processor as dp
 
 class Luna16(BaseDataLoader):
 	def __init__(self, config):
@@ -172,7 +173,7 @@ class Luna16(BaseDataLoader):
 				continue
 			if series not in mask_vals:
 				mask_vals[series] = {}
-			voxelCenter = lp.world_to_voxel_coord(np.array([x, y, z]), o, s)
+			voxelCenter = dp.world_to_voxel_coord(np.array([x, y, z]), o, s)
 			x, y, z = voxelCenter
 			y = int(y)
 			z = int(z)

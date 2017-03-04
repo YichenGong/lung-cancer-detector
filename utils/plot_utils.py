@@ -1,3 +1,4 @@
+import utils.dicom_processor as dp
 import matplotlib.pyplot as plt
 
 from skimage import measure
@@ -21,5 +22,5 @@ def plot_3D(img, threshold=-400):
 	plt.show()
 
 def plot_2d(img):
-	plt.imshow(img, cmap='gray')
+	plt.imshow(img, cmap=plt.cm.gray)
 	plt.show()
