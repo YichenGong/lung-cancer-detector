@@ -43,10 +43,11 @@ class CandidateDataLoader(BaseDataLoader):
 
     while self.current_pointer < current_set_size:
       batch_ids = self.current_ids[self.current_pointer: self.current_pointer + self.batch_size]
+      print('size of batch ids: {}'.format(len(batch_ids)))
       batch_x = np.array([self.get_first_k_patches(id, self.k, self.diameter_mm, self.resize_to)
                           for id in batch_ids])
       batch_x = np.swapaxes(batch_x,0,1)
-
+      print('shape of batch_x: {}'.format(batch_x.shape))
       batch_y = np.array([self.data[id]['label'] for id in batch_ids])
 
       self.current_pointer += self.batch_size
@@ -77,26 +78,29 @@ class CandidateDataLoader(BaseDataLoader):
     """
       Gets first k patches and resize them into unified size.
     """
+    print(1)
     file_path = '{}/{}.pkl'.format(self.patch_dir, pid)
 
     if reuse and os.path.exists(file_path):
+      print(2.1)
       with open(file_path, 'rb') as f:
         result = pickle.load(f)
-
+      
     else:
+      print(2.2)
       d = self.data[pid]
-      scan = dp.get_image_HU('{}/{}'.format(self.sample_dir, pid))
+      scan = dp.get_image_HU('{}{}'.format(self.sample_dir, pid))
       result = []
-
+      print(3)
       for i in range(k):
         raw_patch = get_patch(scan, d[i]['loc'], diameter_mm, d['spacing'])
         resize_factor = [resize_to / float(patch_shape) for patch_shape in raw_patch.shape]
         patch = nd.interpolation.zoom(raw_patch, resize_factor, mode='nearest')
         result.append(patch)
-
+      print(4)
       with open(file_path, 'wb') as f:
         pickle.dump(result, f)
-
+    print(5)
     return result
 
   def split_dataset(self):
@@ -112,8 +116,8 @@ class CandidateDataLoader(BaseDataLoader):
 
   def get_ids_from_sample_dataset(self):
     # take sample dataset both as train and test
-    train_ids = pd.read_csv(self.stage1_dir + "stage1_labels.csv").id.tolist()
-    sample_ids = os.listdir('{}/images/'.format(self.sample_dir))
+    train_ids = pd.read_csv(self.data_dir + "stage1_labels.csv").id.tolist()
+    sample_ids = os.listdir(self.sample_dir)
     ids = [id for id in sample_ids if id in train_ids]
     return ids, ids, ids
 
