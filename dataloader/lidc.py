@@ -110,6 +110,7 @@ class LIDCData(BaseDataLoader):
 
 				if not scan:
 					self._ignored_scans.append(name)
+					self._nodule_info.pop(name, None)
 					continue
 			except:
 				#If this error occurs, manual intervention 
@@ -126,6 +127,9 @@ class LIDCData(BaseDataLoader):
 
 		p.dump(self._ignored_scans, 
 			open(os.path.join(self._target_directory, "ignored_scans.pick"), "wb"),
+			protocol=2)
+		p.dump(self._nodule_info, 
+			open(os.path.join(self._target_directory, "nodule_info.pick"), "wb"),
 			protocol=2)
 		print("Image pre-processing complete!")
 
@@ -150,9 +154,6 @@ class LIDCData(BaseDataLoader):
 						vertices = [(edge.x, edge.y) for edge in roi.get_edges()]
 						self._nodule_info[series].append((iid, z, vertices))
 
-		p.dump(self._nodule_info, 
-			open(os.path.join(self._target_directory, "nodule_info.pick"), "wb"),
-			protocol=2)
 		print("XMLs pre-processing completes...")
 
 	def _check_valid_dicom(self, path):
@@ -160,10 +161,11 @@ class LIDCData(BaseDataLoader):
 			slices = dp.load_lidc_scan(path)
 			if not slices:
 				return False
-		except:
+		except Exception as e:
 			#Some unknown error occured in loading
 			#the dicom
 			#Manual intervention required
+			print(e)
 			print("Some problem with path: ", path)
 			return False
 

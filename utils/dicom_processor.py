@@ -47,8 +47,6 @@ def is_scan_processable(scan):
 		if typeOfScan == 'Digital X-Ray Image Storage - For Presentation':
 			return False
 		if typeOfScan == 'Computed Radiography Image Storage':
-			if size > 2:
-				print("Found radiography image with more than 2 slices")
 			return False
 	else:
 		return False
@@ -71,9 +69,9 @@ def load_lidc_scan(filepath, resize=None, print_details=False):
 
 	slices.sort(key=lambda x: x.ImagePositionPatient[2])
 
+	image = get_slices_HU(slices)
+	origShape = image.shape
 	if resize:
-		image = get_slices_HU(slices)
-		origShape = image.shape
 		image = get_resized_image(image, resize)
 
 	spacing = np.array([slices[0].SliceThickness] + slices[0].PixelSpacing, dtype=np.float32)
