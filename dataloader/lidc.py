@@ -45,7 +45,7 @@ class LIDCData(BaseDataLoader):
 		if do_shuffle:
 			self.shuffle()
 
-		train_size = int(math.ceil((1.0 - self._val) * len(self._train_set)))
+		train_size = int(math.ceil((1.0 - self._val) * len(self._X)))
 		self._current_set_x = self._X[:train_size]
 		self._current_set_size = train_size
 
@@ -53,7 +53,7 @@ class LIDCData(BaseDataLoader):
 		if do_shuffle:
 			self.shuffle()
 
-		train_size = int(math.ceil((1.0 - self._val) * len(self._train_set)))
+		train_size = int(math.ceil((1.0 - self._val) * len(self._X)))
 		self._current_set_x = self._X[train_size:]
 		self._current_set_size = len(self._current_set_x)
 
@@ -70,7 +70,7 @@ class LIDCData(BaseDataLoader):
 		#We just need to build a the list
 		#of patients we have
 		for name in os.listdir(self._target_directory):
-			root, ext = os.apth.splitext(name)
+			root, ext = os.path.splitext(name)
 			if root == "nodule_info" or root == "norm_para" or root == "ignored_scans":
 				continue
 			else:
@@ -93,7 +93,7 @@ class LIDCData(BaseDataLoader):
 
 		count = 1
 		for path, name in self._studies_directory_iter():
-			print("{}/{}Processing ".format(count, total_scans), name)
+			print("{}/{} Processing ".format(count, total_scans), name)
 			count += 1
 
 			for s in os.listdir(path):

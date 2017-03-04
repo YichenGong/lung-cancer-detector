@@ -58,7 +58,7 @@ def load_lidc_scan(filepath, resize=None, print_details=False):
 	slices = [dicom.read_file(filepath + '/' + s) for s in os.listdir(filepath)]
 
 	if not is_scan_processable(slices):
-		print(filepath)
+		print("Not processable: ", filepath)
 		return None
 
 	if print_details:
