@@ -27,7 +27,7 @@ class Luna16(BaseDataLoader):
 	def data_iter(self):
 		self._current_pointer = 0
 
-		batch_X = batch_Y = []
+		batch_X, batch_Y = [], []
 		count = 0
 		
 		while self._current_pointer < self._current_set_size:
@@ -43,7 +43,7 @@ class Luna16(BaseDataLoader):
 				if count % self._batch_size == 0:
 					yield np.array(batch_X), np.array(batch_Y)
 					count = 0
-					batch_X = batch_Y = []
+					batch_X, batch_Y = [], []
 
 			self._current_pointer += 1
 

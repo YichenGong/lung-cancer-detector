@@ -21,7 +21,7 @@ class LIDCData(BaseDataLoader):
 		for nodule in nodules:
 			iid, z, edges = nodule
 			z = int((z - o[2])/s[2])
-			if z == sliceIdx:
+			if z == slide:
 				cv.fillPoly(mask, [edges], 255)
 
 		if img.shape[1] != origShape[1] or img.shape[2] != origShape[2]:
@@ -32,7 +32,7 @@ class LIDCData(BaseDataLoader):
 		#a generator to go through the dataset in a loop
 		current_pointer = 0
 
-		batch_X = batch_Y = []
+		batch_X, batch_Y = [], []
 		count = 0
 		
 		while current_pointer < self._current_set_size:
@@ -49,7 +49,7 @@ class LIDCData(BaseDataLoader):
 				if count % self._batch_size == 0:
 					yield np.array(batch_X), np.array(batch_Y)
 					count = 0
-					batch_X = batch_Y = []
+					batch_X, batch_Y = [], []
 
 			current_pointer += 1
 
@@ -89,7 +89,7 @@ class LIDCData(BaseDataLoader):
 			if root == "nodule_info" or root == "norm_para" or root == "ignored_scans":
 				continue
 			else:
-				self._X.append(name)
+				self._X.append(root)
 
 	def _studies_directory_iter(self):
 		for i in os.listdir(self._studies):
