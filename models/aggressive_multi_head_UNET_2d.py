@@ -7,8 +7,10 @@ class MultiHeadUnet_2D:
 		self.build_encoder()
 
 		self.create_nodule_segment_head()
+		self.create_nodule_segment_loss()
 
 		self.create_cancer_classification_head()
+		self.create_cancer_classification_loss()
 
 	def build_encoder(self):
 		print("Creating encoder part...")
@@ -196,7 +198,7 @@ class MultiHeadUnet_2D:
 		print("Creating Nodule Segmentation part...")
 		with tf.name_scope("Nodule_Segment_Level_1"):
 			self._nodule_upconv1_weights = tf.Variable(tf.truncated_normal(
-														shape=[4, 4, 1024, 256], 
+														shape=[4, 4, 256, 1024], 
 														mean=0.0,
 														stddev=1.0), 
 													name="nodule_upconv1_weights")
@@ -205,10 +207,10 @@ class MultiHeadUnet_2D:
 				mean=0.0,
 				stddev=1.0),
 			name="nodule_upconv1_bias")
-			inp_shape = self._encode.get_shape()
+			inp_shape = tf.shape(self._encode)
 			self._nodule_upconv1_layer = tf.nn.conv2d_transpose(value=self._encode,
 				filter=self._nodule_upconv1_weights,
-				output_shape=[inp_shape[0], inp_shape[1]*4, inp_shape[2]*4, inp_shape[3]//4],
+				output_shape=tf.stack([inp_shape[0], inp_shape[1]*4, inp_shape[2]*4, inp_shape[3]//4]),
 				strides=[1, 4, 4, 1],
 				padding='VALID')
 			self._nodule_upconv1_out = tf.nn.relu(self._nodule_upconv1_layer + self._nodule_upconv1_bias)
@@ -221,26 +223,26 @@ class MultiHeadUnet_2D:
 			x1_crop = tf.slice(self._encode_l2_pool, offsets, size)
 			self._nodule_upconv1_concat = tf.concat([x1_crop, self._nodule_upconv1_out], 3)
 
-			self._nodule_conv11_weights = tf.Variable(tf.truncated_normal(
+			self._nodule_conv1_weights = tf.Variable(tf.truncated_normal(
 														shape=[3, 3, 512, 256], 
 														mean=0.0,
 														stddev=1.0), 
-													name="nodule_conv11_weights")
-			self._nodule_conv11_bias = tf.Variable(tf.truncated_normal(
+													name="nodule_conv1_weights")
+			self._nodule_conv1_bias = tf.Variable(tf.truncated_normal(
 				shape=[256],
 				mean=0.0,
 				stddev=1.0),
-			name="nodule_conv11_bias")
-			self._nodule_conv11_layer = tf.nn.conv2d(input=self._nodule_upconv1_concat,
-				filter=self._nodule_conv11_weights,
+			name="nodule_conv1_bias")
+			self._nodule_conv1_layer = tf.nn.conv2d(input=self._nodule_upconv1_concat,
+				filter=self._nodule_conv1_weights,
 				strides=[1, 1, 1, 1],
 				padding='VALID',
-				name="nodule_conv11_layer")
-			self._nodule_conv11_out = tf.nn.relu(self._nodule_conv11_layer + self._nodule_conv11_bias)
+				name="nodule_conv1_layer")
+			self._nodule_conv1_out = tf.nn.relu(self._nodule_conv1_layer + self._nodule_conv1_bias)
 
 		with tf.name_scope("Nodule_Segment_Level_2"):
 			self._nodule_upconv2_weights = tf.Variable(tf.truncated_normal(
-														shape=[4, 4, 256, 64], 
+														shape=[4, 4, 64, 256], 
 														mean=0.0,
 														stddev=1.0), 
 													name="nodule_upconv2_weights")
@@ -249,10 +251,10 @@ class MultiHeadUnet_2D:
 				mean=0.0,
 				stddev=1.0),
 			name="nodule_upconv2_bias")
-			inp_shape = self._nodule_conv11_out.get_shape()
-			self._nodule_upconv2_layer = tf.nn.conv2d_transpose(value=self._nodule_conv11_out,
+			inp_shape = tf.shape(self._nodule_conv1_out)
+			self._nodule_upconv2_layer = tf.nn.conv2d_transpose(value=self._nodule_conv1_out,
 				filter=self._nodule_upconv2_weights,
-				output_shape=[inp_shape[0], inp_shape[1]*4, inp_shape[2]*4, inp_shape[3]//4],
+				output_shape=tf.stack([inp_shape[0], inp_shape[1]*4, inp_shape[2]*4, inp_shape[3]//4]),
 				strides=[1, 4, 4, 1],
 				padding='VALID')
 			self._nodule_upconv2_out = tf.nn.relu(self._nodule_upconv2_layer + self._nodule_upconv2_bias)
@@ -265,42 +267,46 @@ class MultiHeadUnet_2D:
 			x1_crop = tf.slice(self._encode_conv2_out, offsets, size)
 			self._nodule_upconv2_concat = tf.concat([x1_crop, self._nodule_upconv2_out], 3)
 
-			self._nodule_conv12_weights = tf.Variable(tf.truncated_normal(
+			self._nodule_conv2_weights = tf.Variable(tf.truncated_normal(
 														shape=[3, 3, 128, 64], 
 														mean=0.0,
 														stddev=1.0), 
-													name="nodule_conv12_weights")
-			self._nodule_conv12_bias = tf.Variable(tf.truncated_normal(
+													name="nodule_conv2_weights")
+			self._nodule_conv2_bias = tf.Variable(tf.truncated_normal(
 				shape=[64],
 				mean=0.0,
 				stddev=1.0),
-			name="nodule_conv12_bias")
-			self._nodule_conv12_layer = tf.nn.conv2d(input=self._nodule_upconv2_concat,
-				filter=self._nodule_conv12_weights,
+			name="nodule_conv2_bias")
+			self._nodule_conv2_layer = tf.nn.conv2d(input=self._nodule_upconv2_concat,
+				filter=self._nodule_conv2_weights,
 				strides=[1, 1, 1, 1],
 				padding='VALID',
-				name="nodule_conv12_layer")
-			self._nodule_conv12_out = tf.nn.relu(self._nodule_conv12_layer + self._nodule_conv12_bias)
+				name="nodule_conv2_layer")
+			self._nodule_conv2_out = tf.nn.relu(self._nodule_conv2_layer + self._nodule_conv2_bias)
 
 		with tf.name_scope("Nodule_Segment_Out"):
-			self._nodule_conv13_weights = tf.Variable(tf.truncated_normal(
+			self._nodule_conv3_weights = tf.Variable(tf.truncated_normal(
 														shape=[1, 1, 64, 1], 
 														mean=0.0,
 														stddev=1.0), 
-													name="nodule_conv13_weights")
-			self._nodule_conv13_bias = tf.Variable(tf.truncated_normal(
+													name="nodule_conv3_weights")
+			self._nodule_conv3_bias = tf.Variable(tf.truncated_normal(
 				shape=[1],
 				mean=0.0,
 				stddev=1.0),
-			name="nodule_conv13_bias")
-			self._nodule_conv13_layer = tf.nn.conv2d(input=self._nodule_conv12_out,
-				filter=self._nodule_conv13_weights,
+			name="nodule_conv3_bias")
+			self._nodule_conv3_layer = tf.nn.conv2d(input=self._nodule_conv2_out,
+				filter=self._nodule_conv3_weights,
 				strides=[1, 1, 1, 1],
 				padding='VALID',
-				name="nodule_conv13_layer")
-			self._nodule = self._nodule_conv13_out = tf.nn.relu(self._nodule_conv13_layer + self._nodule_conv13_bias)
+				name="nodule_conv3_layer")
+			self._nodule = self._nodule_conv3_out = tf.nn.relu(self._nodule_conv3_layer + self._nodule_conv3_bias)
 
 		print("Created Nodule Segmentation part!")
+
+	def create_nodule_segment_loss(self):
+		#TODO
+		pass
 
 	def create_cancer_classification_head(self):
 		'''
@@ -308,6 +314,85 @@ class MultiHeadUnet_2D:
 		This will be a simple classification head 
 		of cancer or not
 		'''
+		print("Creating Classification part...")
+		with tf.name_scope("Cancer_Classification_Level_1"):
+			self._cancer_conv1_weights = tf.Variable(tf.truncated_normal(
+				shape=[3, 3, 1024, 256]), 
+				name="cancer_conv1_weights")
+			self._cancer_conv1_bias = tf.Variable(tf.truncated_normal(
+				shape=[256]), 
+				name="cancer_conv1_bias")
+			self._cancer_conv1_layer = tf.nn.conv2d(input=self._encode, 
+				filter=self._cancer_conv1_weights,
+				strides=[1, 1, 1, 1],
+				padding='VALID',
+				name="cancer_conv1_layer")
+			self._cancer_conv1_out = tf.nn.relu(self._cancer_conv1_layer + self._cancer_conv1_bias)
+
+		with tf.name_scope("Cancer_Classification_Level_2"):
+			self._cancer_conv2_weights = tf.Variable(tf.truncated_normal(
+				shape=[3, 3, 256, 64]), 
+				name="cancer_conv2_weights")
+			self._cancer_conv2_bias = tf.Variable(tf.truncated_normal(
+				shape=[64]), 
+				name="cancer_conv2_bias")
+			self._cancer_conv2_layer = tf.nn.conv2d(input=self._cancer_conv1_out, 
+				filter=self._cancer_conv2_weights,
+				strides=[1, 1, 1, 1],
+				padding='VALID',
+				name="cancer_conv2_layer")
+			self._cancer_conv2_out = tf.nn.relu(self._cancer_conv2_layer + self._cancer_conv2_bias)
+
+		with tf.name_scope("Cancer_Classification_Level_3"):
+			self._cancer_l3_pool = tf.nn.max_pool(self._cancer_conv2_out, 
+										ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1],
+										padding='VALID',
+	                         			name="cancer_l3_pool")
+
+		with tf.name_scope("Cancer_Classification_Level_4"):
+			in_shape = self._cancer_l3_pool.get_shape()
+			self._cancer_l4_flatten_in = tf.reshape(self._cancer_l3_pool, 
+				shape=[-1, in_shape[1].value * in_shape[2].value * in_shape[3].value])
+
+			self._cancer_hidden1_weights = tf.Variable(tf.truncated_normal(
+				shape=[in_shape[1].value * in_shape[2].value * in_shape[3].value, 64]), 
+				name="cancer_hidden1_weights")
+
+			self._cancer_hidden1_bias = tf.Variable(tf.truncated_normal(
+				shape=[64]), 
+				name="cancer_hidden1_bias")
+
+			self._cancer_hidden1 = tf.nn.relu(tf.matmul(self._cancer_l4_flatten_in, 
+				self._cancer_hidden1_weights) + self._cancer_hidden1_bias)
+
+		with tf.name_scope("Cancer_Classification_Level_5"):
+			self._cancer_hidden2_weights = tf.Variable(tf.truncated_normal(
+				shape=[64, 64]), 
+				name="cancer_hidden2_weights")
+
+			self._cancer_hidden2_bias = tf.Variable(tf.truncated_normal(
+				shape=[64]), 
+				name="cancer_hidden2_bias")
+
+			self._cancer_hidden2 = tf.nn.relu(tf.matmul(self._cancer_hidden1, 
+				self._cancer_hidden2_weights) + self._cancer_hidden2_bias)
+
+		with tf.name_scope("Cancer_Classification_Out"):
+			self._cancer_out_weights = tf.Variable(tf.truncated_normal(
+				shape=[64, 1]), 
+				name="cancer_out_weights")
+
+			self._cancer_out_bias = tf.Variable(tf.truncated_normal(
+				shape=[1]), 
+				name="cancer_out_bias")
+
+			self._cancer = self._cancer_out = tf.nn.relu(tf.matmul(self._cancer_hidden2, 
+				self._cancer_out_weights) + self._cancer_out_bias)
+
+		print("Created Classification part!")
+
+	def create_cancer_classification_loss(self):
+		#TODO
 		pass
 
 	def create_inputs(self, image_size):
