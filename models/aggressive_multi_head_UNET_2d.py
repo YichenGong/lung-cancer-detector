@@ -185,7 +185,7 @@ class MultiHeadUnet_2D:
 
 		print("Created encoder part!")
 
-	def create_nodule_segment_head():
+	def create_nodule_segment_head(self):
 		'''
 		We'll have more aggressive Deconvolution
 		as compared to what is given in the U-NET
@@ -206,7 +206,7 @@ class MultiHeadUnet_2D:
 				stddev=1.0),
 			name="nodule_upconv1_bias")
 			inp_shape = self._encode.get_shape()
-			self._nodule_upconv1_layer = tf.conv2d_transpose(value=self._encode,
+			self._nodule_upconv1_layer = tf.nn.conv2d_transpose(value=self._encode,
 				filter=self._nodule_upconv1_weights,
 				output_shape=[inp_shape[0], inp_shape[1]*4, inp_shape[2]*4, inp_shape[3]//4],
 				strides=[1, 4, 4, 1],
@@ -231,7 +231,7 @@ class MultiHeadUnet_2D:
 				mean=0.0,
 				stddev=1.0),
 			name="nodule_conv11_bias")
-			self._nodule_conv11_layer = tf.conv2d(input=self._nodule_upconv1_concat,
+			self._nodule_conv11_layer = tf.nn.conv2d(input=self._nodule_upconv1_concat,
 				filter=self._nodule_conv11_weights,
 				strides=[1, 1, 1, 1],
 				padding='VALID',
@@ -250,7 +250,7 @@ class MultiHeadUnet_2D:
 				stddev=1.0),
 			name="nodule_upconv2_bias")
 			inp_shape = self._nodule_conv11_out.get_shape()
-			self._nodule_upconv2_layer = tf.conv2d_transpose(value=self._nodule_conv11_out,
+			self._nodule_upconv2_layer = tf.nn.conv2d_transpose(value=self._nodule_conv11_out,
 				filter=self._nodule_upconv2_weights,
 				output_shape=[inp_shape[0], inp_shape[1]*4, inp_shape[2]*4, inp_shape[3]//4],
 				strides=[1, 4, 4, 1],
@@ -275,7 +275,7 @@ class MultiHeadUnet_2D:
 				mean=0.0,
 				stddev=1.0),
 			name="nodule_conv12_bias")
-			self._nodule_conv12_layer = tf.conv2d(input=self._nodule_upconv2_concat,
+			self._nodule_conv12_layer = tf.nn.conv2d(input=self._nodule_upconv2_concat,
 				filter=self._nodule_conv12_weights,
 				strides=[1, 1, 1, 1],
 				padding='VALID',
@@ -293,7 +293,7 @@ class MultiHeadUnet_2D:
 				mean=0.0,
 				stddev=1.0),
 			name="nodule_conv13_bias")
-			self._nodule_conv13_layer = tf.conv2d(input=self._nodule_conv12_out,
+			self._nodule_conv13_layer = tf.nn.conv2d(input=self._nodule_conv12_out,
 				filter=self._nodule_conv13_weights,
 				strides=[1, 1, 1, 1],
 				padding='VALID',
@@ -302,7 +302,7 @@ class MultiHeadUnet_2D:
 
 		print("Created Nodule Segmentation part!")
 
-	def create_cancer_classification_head():
+	def create_cancer_classification_head(self):
 		'''
 		Cancer classification head
 		This will be a simple classification head 
