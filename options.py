@@ -31,6 +31,14 @@ def parse():
 	
 	parser.add_argument("-v", "--verbose", help="Verbose output", action="store_true")
 
+	#Multi-Head-Specific
+	parser.add_argument("--amhu2-luna-train", help="Aggressive Multi-Head Unet 2D, Train Luna", action="store_true")
+	parser.add_argument("--amhu2-lidc-train", help="Aggressive Multi-Head Unet 2D, Train LIDC", action="store_true")
+	parser.add_argument("--amhu2-luna-lidc-train", help="Aggressive Multi-Head Unet 2D, Train on intermixed set of LUNA and LIDC segmentation data", action="store_true")
+	parser.add_argument("--amhu2-sample-train", help="Aggressive Multi-Head Unet 2D, Train Sample Kaggle", action="store_true")
+	parser.add_argument("--amhu2-stage1-train", help="Aggressive Multi-Head Unet 2D, Train Stage1 Kaggle", action="store_true")
+	parser.add_argument("--amhu2-infer", help="Aggressive Multi-Head Unet 2D, Infer Stage1 Test Dataset", action="store_true")
+
 	return parser.parse_args()
 
 if __name__ == "__main__":

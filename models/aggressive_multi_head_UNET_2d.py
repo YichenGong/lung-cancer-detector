@@ -1,5 +1,6 @@
 from __future__ import print_function
 import tensorflow as tf
+import numpy as np
 
 class MultiHeadUnet_2D:
 	def __init__(self, image_size=(512, 512)):
@@ -183,6 +184,7 @@ class MultiHeadUnet_2D:
 				strides=[1, 1, 1, 1],
 				padding='VALID',
 				name="encode_conv1_layer")
+
 			self._encode = self._encode_conv10_out = tf.nn.relu(self._encode_conv10_layer + self._encode_conv10_bias)
 
 		print("Created encoder part!")
@@ -215,12 +217,12 @@ class MultiHeadUnet_2D:
 				padding='VALID')
 			self._nodule_upconv1_out = tf.nn.relu(self._nodule_upconv1_layer + self._nodule_upconv1_bias)
 
-			x1_shape = tf.shape(self._encode_l2_pool)
+			x1_shape = tf.shape(self._encode_conv6_out)
 			x2_shape = tf.shape(self._nodule_upconv1_out)
 			# offsets for the top left corner of the crop
 			offsets = [0, (x1_shape[1] - x2_shape[1]) // 2, (x1_shape[2] - x2_shape[2]) // 2, 0]
 			size = [-1, x2_shape[1], x2_shape[2], -1]
-			x1_crop = tf.slice(self._encode_l2_pool, offsets, size)
+			x1_crop = tf.slice(self._encode_conv6_out, offsets, size)
 			self._nodule_upconv1_concat = tf.concat([x1_crop, self._nodule_upconv1_out], 3)
 
 			self._nodule_conv1_weights = tf.Variable(tf.truncated_normal(
@@ -307,7 +309,9 @@ class MultiHeadUnet_2D:
 	def create_nodule_segment_loss(self):
 		print("Creating loss of Nodule Segmentation...")
 		target_flattened = tf.reshape(self.Y_nodule, [-1, 1])
-		logits_flattened = tf.reshape(self._nodule, [-1, 1])
+		self._nodule_padded = tf.image.resize_images(self._nodule, 
+			[self.Y_nodule.get_shape()[1].value, self.Y_nodule.get_shape()[2].value])
+		logits_flattened = tf.reshape(self._nodule_padded, [-1, 1])
 		self._nodule_loss = tf.reduce_mean(
 				tf.nn.weighted_cross_entropy_with_logits(
 						targets=target_flattened,
@@ -426,27 +430,91 @@ class MultiHeadUnet_2D:
 		self.Y_nodule = tf.placeholder(dtype=tf.float32,
 			shape=[None, image_size[0], image_size[1], 1],
 			name="out_nodule")
-		self.Y_nodule_weight = tf.placeholder_with_default(input=[1.0],
-			shape=[1],
+		self.Y_nodule_weight = tf.placeholder_with_default(input=1.0,
+			shape=None,
 			name="nodule_weight")
 		
 		#Cancer head
 		self.Y_cancer = tf.placeholder(dtype=tf.float32,
 			shape=[None, 1],
 			name="out_cancer")
-		self.Y_cancer_weight = tf.placeholder_with_default(input=[1.0],
-			shape=[1],
+		self.Y_cancer_weight = tf.placeholder_with_default(input=1.0,
+			shape=None,
 			name="cancer_weight")
 
 		#Boolean variables to check head and mode
 		self.is_training = tf.placeholder(dtype=tf.bool,
-			shape=[1],
 			name="is_training")
 		self.is_nodule = tf.placeholder(dtype=tf.bool,
-			shape=[1],
 			name="is_nodule")
 		self.is_cancer = tf.placeholder(dtype=tf.bool,
-			shape=[1],
 			name="is_cancer")
 
 		print("Created input placeholders!")
+
+	def train_nodule(self, dl, epochs, learning_rate, momentum, decay_rate, positive_weight=1.0):
+		gs = tf.Variable(0, trainable=False)
+		lr = tf.train.exponential_decay(learning_rate, gs, 100000, decay_rate, staircase=True)
+
+		self._nodule_optimizer = tf.train.MomentumOptimizer(lr, 
+			momentum).minimize(self._nodule_loss)
+
+		init = tf.global_variables_initializer()
+		with tf.Session() as sess:
+			sess.run(init)
+
+			for epoch in range(epochs):
+				loss = 0.0
+				step = 0
+				dl.train(do_shuffle=True)
+
+				for X, Y in dl.data_iter():
+					X = np.expand_dims(X, axis=len(X.shape))
+					Y = np.expand_dims(Y, axis=len(Y.shape))
+					step += 1
+					_, l = sess.run([self._nodule_optimizer, self._nodule_loss],
+						feed_dict={
+							self.X: X,
+							self.Y_nodule: Y,
+							self.Y_nodule_weight: positive_weight,
+							self.is_training: True,
+							self.is_nodule: True,
+							self.is_cancer: False
+						})
+					print("Batch Training Loss: {}".format(l))
+					loss += l
+
+				print("Epoch Training Loss: {}".format(loss/step))
+
+				loss = 0.0
+				step = 0
+				dl.validate()
+				for X, Y in dl.data_iter():
+					step += 1
+					l = sess.run([self._nodule_loss],
+						feed_dict={
+							self.X: X,
+							self.Y_nodule: Y,
+							self.Y_nodule_weight: [positive_weight],
+							self.is_training: True,
+							self.is_nodule: True,
+							self.is_cancer: False
+						})
+					print("Batch Validation Loss: {}".format(l))
+					loss += l
+				print("Epoch Validation Loss: {}".format(loss/step))
+
+	def infer_nodule(self, X):
+		pass
+
+	def train_cancer(self, X, Y, positive_weight=1.0):
+		pass
+
+	def validate_cancer(self, X, Y, positive_weight=1.0):
+		pass
+
+	def infer_cancer(self, X):
+		pass
+
+def get_model():
+	return MultiHeadUnet_2D()
