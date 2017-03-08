@@ -305,8 +305,18 @@ class MultiHeadUnet_2D:
 		print("Created Nodule Segmentation part!")
 
 	def create_nodule_segment_loss(self):
-		#TODO
-		pass
+		print("Creating loss of Nodule Segmentation...")
+		target_flattened = tf.reshape(self.Y_nodule, [-1, 1])
+		logits_flattened = tf.reshape(self._nodule, [-1, 1])
+		self._nodule_loss = tf.reduce_mean(
+				tf.nn.weighted_cross_entropy_with_logits(
+						targets=target_flattened,
+						logits=logits_flattened,
+						pos_weight=self.Y_nodule_weight,
+						name="Nodule_Loss"
+					)
+			)
+		print("Creating loss of Nodule Segmentation...")
 
 	def create_cancer_classification_head(self):
 		'''
@@ -392,8 +402,16 @@ class MultiHeadUnet_2D:
 		print("Created Classification part!")
 
 	def create_cancer_classification_loss(self):
-		#TODO
-		pass
+		print("Adding loss to Cacner Classification...")
+		self._cancer_loss = tf.reduce_mean(
+				tf.nn.weighted_cross_entropy_with_logits(
+						targets=self.Y_cancer,
+						logits=self._cancer,
+						pos_weight=self.Y_cancer_weight,
+						name="Cancer_Loss"
+					)
+			)
+		print("Added loss to Cacner Classification!")
 
 	def create_inputs(self, image_size):
 		print("Creating input Placeholders...")
@@ -403,12 +421,22 @@ class MultiHeadUnet_2D:
 			name="in")
 
 		#Outputs of the different heads
+		
+		#Nodule head
 		self.Y_nodule = tf.placeholder(dtype=tf.float32,
 			shape=[None, image_size[0], image_size[1], 1],
 			name="out_nodule")
+		self.Y_nodule_weight = tf.placeholder_with_default(input=[1.0],
+			shape=[1],
+			name="nodule_weight")
+		
+		#Cancer head
 		self.Y_cancer = tf.placeholder(dtype=tf.float32,
 			shape=[None, 1],
 			name="out_cancer")
+		self.Y_cancer_weight = tf.placeholder_with_default(input=[1.0],
+			shape=[1],
+			name="cancer_weight")
 
 		#Boolean variables to check head and mode
 		self.is_training = tf.placeholder(dtype=tf.bool,
