@@ -149,6 +149,9 @@ class Luna16(BaseDataLoader):
 		if not(os.path.exists(self._target_directory) 
 			and os.path.isdir(self._target_directory)):
 			return False
+		else:
+			print("Found pre-processed datasets")
+			return True
 
 		#Check if all patients exists
 		for patient in self._all_series:

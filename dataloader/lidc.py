@@ -190,6 +190,9 @@ class LIDCData(BaseDataLoader):
 		if not(os.path.exists(self._target_directory) 
 			and os.path.isdir(self._target_directory)):
 			return False
+		else:
+			print("Found pre-processed datasets")
+			return True
 
 		#Check if all patients exists
 		for path, name in self._studies_directory_iter():
