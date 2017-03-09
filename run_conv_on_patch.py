@@ -9,7 +9,7 @@ import importlib
 from dataloader.candidates import CandidateDataLoader
 from models.conv_on_patch_model import ConvOnPatches
 log_dir = "oldLogs/"
-model_dir = "conv-1/"
+model_dir = "conv-3/"
 if not os.path.exists(log_dir + model_dir):
 	os.makedirs(os.path.dirname(log_dir + model_dir))
 
@@ -22,9 +22,9 @@ opt.diameter_mm = 30
 # Build graph
 #######################################################
 with tf.device('/gpu:0'):
-  chan = [1,32,64,64,128,128,256,512]
-  kernel = [5,5,3,3,2,3,3]
-  stride = [1,2,1,1,2,1,1]
+  chan = [1,32,64,64,128,128,256,256]
+  kernel = [5,5,3,3,3,3,3]
+  stride = [1,2,1,1,1,1,1]
   num_hidden = 64
   num_labels = 1
   num_nodules = opt.top_k
@@ -70,12 +70,11 @@ with tf.Session(config=sess_config) as session:
     #################################################
     dl.train()
     print('switch to training')
-    for train_data, train_label in dl.data_iter():
+    for train_data, train_label, train_id in dl.data_iter():
       feed_dict = {tf_dataset: train_data, tf_labels: train_label, is_training: True}
       print('run the session now')
       _, l, preds = session.run([train_op, loss, prediction], feed_dict=feed_dict)
       #print('labels: preds \n %s' % np.concatenate((train_label, preds), axis=1))
-      print('batch loss:{}'.format(l))   
       f.write('train: %f\n' % l)
       f.flush()
 
@@ -85,11 +84,11 @@ with tf.Session(config=sess_config) as session:
     dl.validate()
     total_loss = 0
     count = 0
-    for valid_data, valid_label in dl.data_iter():
+    for valid_data, valid_label, valid_id in dl.data_iter():
 
       feed_dict = {tf_dataset: valid_data, tf_labels: valid_label, is_training: False}
       l = session.run(loss, feed_dict=feed_dict)
-      batch_size = valid_data.shape[0]
+      batch_size = valid_id.shape[0]
       total_loss = total_loss + l * batch_size
       count = count + batch_size
 
@@ -121,8 +120,8 @@ with tf.Session(config=sess_config) as session:
 
       feed_dict = {tf_dataset: test_data, is_training: False}
       preds = session.run(prediction, feed_dict=feed_dict)
-      for i in range(test_data.shape[0]):
-        pred_dict[test_id[i]] = preds[i][0]
+      for i in range(test_id.shape[0]):
+        pred_dict[test_id[i][0]] = preds[i][0]
 
   print("Save submission to submission_backup.csv")
   with open(log_dir + model_dir + 'submission_backup.csv', 'w') as f:

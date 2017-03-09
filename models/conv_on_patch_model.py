@@ -18,7 +18,7 @@ class ConvOnPatches():
                                     stride=[1, stride[layer - 1], stride[layer - 1], stride[layer - 1], 1],
                                     bias_shape=[chan[layer]],
                                     is_training=phase))
-          conv[layer][i] = dropout(conv[layer][i], keep_prob=0.66, is_training=phase)
+          conv[layer][i] = dropout(conv[layer][i], keep_prob=0.6, is_training=phase)
 
     hidden = []
     for i in range(self.k):
@@ -46,7 +46,7 @@ def conv_bn_relu(input, kernel_shape, stride, bias_shape, is_training):
   biases = tf.get_variable("biases", bias_shape, initializer=tf.constant_initializer(0.0))
 
   # print(input.get_shape())
-  conv = tf.nn.conv3d(input, weights, strides=stride, padding='SAME')
+  conv = tf.nn.conv3d(input, weights, strides=stride, padding='VALID')
   batch_norm = tf.contrib.layers.batch_norm(conv + biases, is_training=is_training)
   relu = tf.nn.relu(batch_norm)
   return relu

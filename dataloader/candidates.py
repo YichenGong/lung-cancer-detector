@@ -49,7 +49,7 @@ class CandidateDataLoader(BaseDataLoader):
       batch_y = np.array([self.data[id]['label'] for id in batch_ids])
 
       self.current_pointer += self.batch_size
-      yield expand_last_dim(batch_x, batch_y), batch_ids
+      yield expand_last_dim(batch_x, batch_y, np.array(batch_ids))
 
 
   def train(self, do_shuffle=True):
@@ -105,7 +105,7 @@ class CandidateDataLoader(BaseDataLoader):
     train_ids = ids[split_point:]
     valid_ids = ids[:split_point]
     test_ids = pd.read_csv(self.data_dir + "stage1_sample_submission.csv").id.tolist()
-
+    print(len(train_ids), len(valid_ids), len(test_ids))
     return train_ids, valid_ids, test_ids
 
   def get_ids_from_sample_dataset(self):
