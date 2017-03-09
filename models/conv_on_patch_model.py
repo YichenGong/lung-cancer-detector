@@ -4,7 +4,7 @@ class ConvOnPatches():
   def __init__(self, num_nodules):
     self.k = num_nodules
 
-  def graph(self, data, phase, chan, num_hidden, num_labels):
+  def graph(self, data, phase, chan, kernel, stride, num_hidden, num_labels):
     # build the conv layer for k nodules sharing weights, conv[layer_idx][nodule_idx]
     conv = [data] # init the layer zero as data
     num_conv_layers = len(chan) - 1
@@ -14,10 +14,11 @@ class ConvOnPatches():
       for i in range(self.k):
         with tf.variable_scope("conv_{}".format(layer), reuse=(i>0)):
           conv[layer].append(conv_bn_relu(conv[layer - 1][i],
-                                    kernel_shape=[5, 5, 5, chan[layer - 1], chan[layer]],
-                                    stride=[1, 2, 2, 2, 1],
+                                    kernel_shape=[kernel[layer - 1], kernel[layer - 1], kernel[layer - 1], chan[layer - 1], chan[layer]],
+                                    stride=[1, stride[layer - 1], stride[layer - 1], stride[layer - 1], 1],
                                     bias_shape=[chan[layer]],
                                     is_training=phase))
+          conv[layer][i] = dropout(conv[layer][i], keep_prob=0.66, is_training=phase)
 
     hidden = []
     for i in range(self.k):
@@ -27,6 +28,7 @@ class ConvOnPatches():
                                  weight_shape=[reshape.get_shape()[1].value, num_hidden],
                                  bias_shape=[num_hidden],
                                  is_training=phase))
+        hidden[i] = dropout(hidden[i], keep_prob=0.5, is_training=phase)
 
     output = []
     for i in range(self.k):
@@ -35,7 +37,7 @@ class ConvOnPatches():
                                    weight_shape=[num_hidden, num_labels],
                                    bias_shape=[num_labels]))
 
-    return tf.reduce_mean(output, axis=0)
+    return tf.reduce_max(output, axis=0)
 
 
 
@@ -44,7 +46,7 @@ def conv_bn_relu(input, kernel_shape, stride, bias_shape, is_training):
   biases = tf.get_variable("biases", bias_shape, initializer=tf.constant_initializer(0.0))
 
   # print(input.get_shape())
-  conv = tf.nn.conv3d(input, weights, strides=stride, padding='VALID')
+  conv = tf.nn.conv3d(input, weights, strides=stride, padding='SAME')
   batch_norm = tf.contrib.layers.batch_norm(conv + biases, is_training=is_training)
   relu = tf.nn.relu(batch_norm)
   return relu

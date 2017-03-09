@@ -18,7 +18,9 @@ opt.diameter_mm = 30
 # Build graph
 #######################################################
 with tf.device('/gpu:0'):
-  chan = [1,4,8,16]
+  chan = [1,32,64,64,128,128,256,512]
+  kernel = [5,5,3,3,2,3,3]
+  stride = [1,2,1,1,2,1,1]
   num_hidden = 64
   num_labels = 1
   num_nodules = opt.top_k
@@ -28,8 +30,8 @@ with tf.device('/gpu:0'):
   is_training = tf.placeholder(tf.bool)
 
   model = ConvOnPatches(num_nodules=num_nodules)
-  logits = model.graph(tf_dataset, is_training, chan, num_hidden, num_labels)
-  loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=tf_labels))
+  logits = model.graph(tf_dataset, is_training, chan, kernel, stride, num_hidden, num_labels)
+  loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits, tf_labels))
 
   # Optimizer.
   update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -55,18 +57,19 @@ with tf.Session(config=sess_config) as session:
   tf.global_variables_initializer().run()
   print("Initialized.")
 
+  f = open('loss.log', 'w')
   for epoch in range(num_epochs):
     # Training
     dl.train()
     print('switch to training')
     for train_data, train_label in dl.data_iter():
-
       feed_dict = {tf_dataset: train_data, tf_labels: train_label, is_training: True}
       print('run the session now')
       _, l, preds = session.run([train_op, loss, prediction], feed_dict=feed_dict)
       #print('labels: preds \n %s' % np.concatenate((train_label, preds), axis=1))
       print('batch loss:{}'.format(l))   
-   
+      f.write('train: %f\n' % l)
+      f.flush()
 
     # Validation
     dl.validate()
@@ -81,4 +84,7 @@ with tf.Session(config=sess_config) as session:
       count = count + batch_size
 
     valid_loss = total_loss / count
+    f.write('valid: %f\n' %  valid_loss)
+    f.flush()
     print('epoch[{}] valid loss: {}'.format(epoch, valid_loss))
+  f.close()
