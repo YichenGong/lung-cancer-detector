@@ -8,6 +8,10 @@ import importlib
 
 from dataloader.candidates import CandidateDataLoader
 from models.conv_on_patch_model import ConvOnPatches
+log_dir = "oldLogs/"
+model_dir = "conv-1/"
+if not os.path.exists(log_dir + model_dir):
+	os.makedirs(os.path.dirname(log_dir + model_dir))
 
 opt = options.parse()
 ## args for loader
@@ -52,14 +56,18 @@ sess_config.log_device_placement=False
 sess_config.allow_soft_placement=True
 
 dl = CandidateDataLoader(opt)
+saver = tf.train.Saver()
+global_min_loss = 100.0
 
 with tf.Session(config=sess_config) as session:
   tf.global_variables_initializer().run()
   print("Initialized.")
 
-  f = open('loss.log', 'w')
+  f = open(log_dir + model_dir + 'loss.log', 'w')
   for epoch in range(num_epochs):
+    #################################################
     # Training
+    #################################################
     dl.train()
     print('switch to training')
     for train_data, train_label in dl.data_iter():
@@ -71,7 +79,9 @@ with tf.Session(config=sess_config) as session:
       f.write('train: %f\n' % l)
       f.flush()
 
+    #################################################
     # Validation
+    #################################################
     dl.validate()
     total_loss = 0
     count = 0
@@ -86,5 +96,40 @@ with tf.Session(config=sess_config) as session:
     valid_loss = total_loss / count
     f.write('valid: %f\n' %  valid_loss)
     f.flush()
-    print('epoch[{}] valid loss: {}'.format(epoch, valid_loss))
+
+    if valid_loss < global_min_loss:
+      # Saves the model and update global min loss
+      print('update global min loss to: %f' % valid_loss)
+      saver.save(session, log_dir + model_dir + 'model.ckpt')
+      global_min_loss = valid_loss
   f.close()
+
+  #################################################
+  # Test Prediction
+  #################################################
+  dl.test()
+  pred_dict = {}
+  # Restore best model
+  ckpt = tf.train.get_checkpoint_state(log_dir + model_dir)
+  # print('checkpoint found: %s' % ckpt)
+  # print('checkpoint path:%s' % ckpt.model_checkpoint_path)
+  if ckpt and ckpt.model_checkpoint_path:
+    saver.restore(session, ckpt.model_checkpoint_path)
+    print('model restored.')
+
+    for test_data, _, test_id in dl.data_iter():
+
+      feed_dict = {tf_dataset: test_data, is_training: False}
+      preds = session.run(prediction, feed_dict=feed_dict)
+      for i in range(test_data.shape[0]):
+        pred_dict[test_id[i]] = preds[i][0]
+
+  print("Save submission to submission_backup.csv")
+  with open(log_dir + model_dir + 'submission_backup.csv', 'w') as f:
+    writer = csv.writer(f)
+    # write the header
+    for row in {'id': 'cancer'}.items():
+      writer.writerow(row)
+    # write the content
+    for row in pred_dict.items():
+      writer.writerow(row)

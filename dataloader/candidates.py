@@ -49,7 +49,7 @@ class CandidateDataLoader(BaseDataLoader):
       batch_y = np.array([self.data[id]['label'] for id in batch_ids])
 
       self.current_pointer += self.batch_size
-      yield expand_last_dim(batch_x, batch_y)
+      yield expand_last_dim(batch_x, batch_y), batch_ids
 
 
   def train(self, do_shuffle=True):
