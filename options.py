@@ -20,6 +20,7 @@ def parse():
 	parser.add_argument("--original", help="Use original size of the images", action="store_true")
 	parser.add_argument("--seed", help="Random Generator Seed", type=int, default=0)
 	parser.add_argument("--model-save-path", help="Model Saving Path", type=str, default="summaries/")
+	parser.add_argument("--summary-step", help="Number of steps to take a summary", type=int, default=1000)
 
 	# Loader specific options
 	parser.add_argument("--padded-images", help="Make all images of the same size by zero padding", action="store_true")

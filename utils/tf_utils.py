@@ -72,3 +72,25 @@ def deconv_2d_drop_bn_relu(inp, inp_chan, out_chan, kernel, stride=1, prob=1.0, 
 	out = tf.nn.relu(tf.contrib.layers.batch_norm(drop + bias))
 
 	return out, weights, bias
+
+def add_weights_summary(weights, name=""):
+	with tf.name_scope(name+"_summary"):
+		mean = tf.reduce_mean(weights)
+		tf.summary.scalar('mean', mean)
+		with tf.name_scope('stddev'):
+			stddev = tf.sqrt(tf.reduce_mean(tf.square(weights - mean)))
+		tf.summary.scalar('stddev', stddev)
+		tf.summary.scalar('max', tf.reduce_max(weights))
+		tf.summary.scalar('min', tf.reduce_min(weights))
+		tf.summary.histogram('histogram', weights)
+
+def add_weights_as_images_summary(weights, height, width, channels, num=10, name=""):
+	with tf.name_scope(name+"_summary"):
+		weight_reshaped_as_image = tf.reshape(weights, [-1, height, width, channels])
+		tf.summary.image('image',
+			weight_reshaped_as_image,
+			max_outputs=num)
+
+def add_scalar_summary(val, name=""):
+	with tf.name_scope(name+"_summary"):
+		tf.summary.scalar('val', val)
