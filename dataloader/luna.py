@@ -41,14 +41,20 @@ class Luna16(BaseDataLoader):
 				count += 1
 
 				if count % self._batch_size == 0:
-					yield np.array(batch_X), np.array(batch_Y)
+					Y = np.array(batch_Y)
+					Y[Y > 0] = 1
+					Y[Y <= 0] = 0
+					yield np.array(batch_X), Y
 					count = 0
 					batch_X, batch_Y = [], []
 
 			self._current_pointer += 1
 
 		if len(batch_X) > 0:
-			yield np.array(batch_X), np.array(batch_Y)
+			Y = np.array(batch_Y)
+			Y[Y > 0] = 1
+			Y[Y <= 0] = 0
+			yield np.array(batch_X), Y
 
 	def train(self, do_shuffle=True):
 		if do_shuffle:

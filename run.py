@@ -14,7 +14,7 @@ This one script takes care of all the boilerplate code
 needed to run an experiment on the dataset and subsequently 
 create a Kaggle Submission file (if the mode includes testing)
 '''
-import tensorflow as tf
+#import tensorflow as tf
 
 import options
 opt = options.parse()
@@ -24,7 +24,7 @@ import random
 
 #Set the random seed for further usage
 random.seed(opt.seed)
-tf.set_random_seed(opt.seed)
+#tf.set_random_seed(opt.seed)
 
 #Import the data loader
 dl = (importlib.import_module("dataloader." + opt.data)).get_data_loader(opt)

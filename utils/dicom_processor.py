@@ -92,12 +92,12 @@ def get_resampled(filepath, new_spacing=[1, 1, 1]):
 
 	return nd.interpolation.zoom(image, real_resize_factor, mode='nearest')
 
-def get_resized(filepath, new_size):
+def get_resized(filepath, new_size, padding=False):
 	image = get_image_HU(filepath)
-	return get_resized_image(image, new_size)
+	return get_resized_image(image, new_size, padding)
 
-def get_resized_image(image, new_size):
-	return imu.resize_3d(image, new_size)
+def get_resized_image(image, new_size, padding=False):
+	return imu.resize_3d(image, new_size, padding)
 
 def world_to_voxel_coord(worldCoord, origin, spacing):
 	strectchedVoxelCoord = np.absolute(worldCoord - origin)
@@ -105,9 +105,8 @@ def world_to_voxel_coord(worldCoord, origin, spacing):
 
 	return voxelCoord
 
-def normalize_planes(npzarray):
-	maxHU = 400
-	minHU = -1000
+def normalize_planes(npzarray, maxHU=400., minHU=-1000.):
+	maxHU, minHU = float(maxHU), float(minHU)
 
 	npzarray = (npzarray - minHU) / (maxHU - minHU)
 	npzarray[npzarray > 1] = 1

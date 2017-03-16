@@ -22,7 +22,14 @@ class LIDCData(BaseDataLoader):
 			iid, z, edges = nodule
 			z = int((z - o[2])/s[2])
 			if z == slide:
-				cv.fillPoly(mask, [edges], 255)
+				if edges.shape[0] > 1:
+					cv.fillPoly(mask, [edges], 255)
+				else:
+					#It's a small nodule. Make a circle of radius 3mm
+					edges = np.squeeze(edges)
+					center = tuple(edges)
+					radius = max(3.0/s[0], 3.0/s[1])
+					cv.circle(mask, center, int(radius+1), 255, -1)
 
 		if img.shape[1] != origShape[1] or img.shape[2] != origShape[2]:
 			mask = imu.resize_2d(mask, (img.shape[1], img.shape[2]))
@@ -47,14 +54,20 @@ class LIDCData(BaseDataLoader):
 				count += 1
 
 				if count % self._batch_size == 0:
-					yield np.array(batch_X), np.array(batch_Y)
+					Y = np.array(batch_Y)
+					Y[Y > 0] = 1
+					Y[Y <= 0] = 0
+					yield np.array(batch_X), Y
 					count = 0
 					batch_X, batch_Y = [], []
 
 			current_pointer += 1
 
 		if len(batch_X) > 0:
-			yield np.array(batch_X), np.array(batch_Y)
+			Y = np.array(batch_Y)
+			Y[Y > 0] = 1
+			Y[Y <= 0] = 0
+			yield np.array(batch_X), Y
 
 	def train(self, do_shuffle=True):
 		if do_shuffle:
@@ -65,9 +78,6 @@ class LIDCData(BaseDataLoader):
 		self._current_set_size = train_size
 
 	def validate(self):
-		if do_shuffle:
-			self.shuffle()
-
 		train_size = int(math.ceil((1.0 - self._val) * len(self._X)))
 		self._current_set_x = self._X[train_size:]
 		self._current_set_size = len(self._current_set_x)

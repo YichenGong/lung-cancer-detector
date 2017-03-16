@@ -15,9 +15,11 @@ def parse():
 	parser.add_argument("-e", "--epochs", help="Number of epochs to run", type=int, default=100)
 	parser.add_argument("-b", "--batch", help="Batch size", type=int, default=32)
 	parser.add_argument("--threads", help="Number of threads", type=int, default=1)
+	parser.add_argument("--false-negative-weight", help="Weight on false negative predictions", type=float, default=1.0)
 	parser.add_argument("-s", "--size", help="Size of images DEPTH * HEIGHT * WIDTH", nargs=3, type=int, default=[128, 128, 128])
 	parser.add_argument("--original", help="Use original size of the images", action="store_true")
 	parser.add_argument("--seed", help="Random Generator Seed", type=int, default=0)
+	parser.add_argument("--model-save-path", help="Model Saving Path", type=str, default="summaries/")
 
 	# Loader specific options
 	parser.add_argument("--padded-images", help="Make all images of the same size by zero padding", action="store_true")
@@ -37,6 +39,7 @@ def parse():
 	parser.add_argument("--amhu2-luna-lidc-train", help="Aggressive Multi-Head Unet 2D, Train on intermixed set of LUNA and LIDC segmentation data", action="store_true")
 	parser.add_argument("--amhu2-sample-train", help="Aggressive Multi-Head Unet 2D, Train Sample Kaggle", action="store_true")
 	parser.add_argument("--amhu2-stage1-train", help="Aggressive Multi-Head Unet 2D, Train Stage1 Kaggle", action="store_true")
+	parser.add_argument("--amhu2-nodule-cancer-train", help="Aggressive Multi-Head Unet 2D, Train Cancer head using data from LIDC/LUNA", action="store_true")
 	parser.add_argument("--amhu2-infer", help="Aggressive Multi-Head Unet 2D, Infer Stage1 Test Dataset", action="store_true")
 
 	return parser.parse_args()
