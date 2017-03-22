@@ -33,6 +33,7 @@ class Luna16(BaseDataLoader):
 		while self._current_pointer < self._current_set_size:
 			img, o, s = p.load(open(os.path.join(self._target_directory, 
 				self._X[self._current_pointer] + ".pick"), "rb"))
+			img = dp.normalize_planes(img)
 			
 			for sliceIdx in range(img.shape[0]):
 				batch_X.append(img[sliceIdx])

@@ -45,6 +45,7 @@ class LIDCData(BaseDataLoader):
 		while current_pointer < self._current_set_size:
 			(img, s, o, origShape) = p.load(open(os.path.join(self._target_directory, 
 				self._X[current_pointer] + ".pick"), "rb"))
+			img = dp.normalize_planes(img)
 			
 			for sliceIdx in range(img.shape[0]):
 				batch_X.append(img[sliceIdx])

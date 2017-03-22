@@ -101,7 +101,9 @@ class Stage1Kaggle(BaseDataLoader):
 		self._current_set_y = [0] * self._current_set_size
 
 	def _load_patient(self, patient):
-		return p.load(open(os.path.join(self._target_directory, patient + ".pick"), "rb"))
+		img = p.load(open(os.path.join(self._target_directory, patient + ".pick"), "rb"))
+		img = dp.normalize_planes(img)
+		return img
 
 	def data_iter(self):
 		self._current_pointer = 0

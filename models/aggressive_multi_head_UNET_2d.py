@@ -10,6 +10,8 @@ class MultiHeadUnet_2D:
 		self.create_inputs(image_size)
 		self.build_encoder()
 
+		self._update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+
 		self.create_nodule_segment_head()
 		self.create_nodule_segment_loss()
 
@@ -45,7 +47,8 @@ class MultiHeadUnet_2D:
 						conv_kernels[idx],
 						conv_strides[idx],
 						dropout_prob,
-						"{}".format(idx%2)
+						"{}".format(idx%2),
+						is_train=self.is_training
 					)
 				self._encode_conv_weights.append((weight, bias))
 				self._encode_conv.append(out)
@@ -89,7 +92,8 @@ class MultiHeadUnet_2D:
 					4,
 					4,
 					self.drop_prob,
-					"up_1"
+					"up_1",
+					is_train=self.is_training
 				)
 			self._nodule_seg_outs.append(out)
 			self._nodule_seg_weights.append((weights, bias))
@@ -112,7 +116,8 @@ class MultiHeadUnet_2D:
 					3,
 					1,
 					self.drop_prob,
-					"up_1"
+					"up_1",
+					is_train=self.is_training
 				)
 			self._nodule_seg_outs.append(out)
 			self._nodule_seg_weights.append((weights, bias))
@@ -126,7 +131,8 @@ class MultiHeadUnet_2D:
 					4,
 					4,
 					self.drop_prob,
-					"up_1"
+					"up_1",
+					is_train=self.is_training
 				)
 			self._nodule_seg_outs.append(out)
 			self._nodule_seg_weights.append((weights, bias))
@@ -149,7 +155,8 @@ class MultiHeadUnet_2D:
 					3,
 					1,
 					self.drop_prob,
-					"up_2"
+					"up_2",
+					is_train=self.is_training
 				)
 			self._nodule_seg_outs.append(out)
 			self._nodule_seg_weights.append((weights, bias))
@@ -163,7 +170,8 @@ class MultiHeadUnet_2D:
 					1,
 					1,
 					self.drop_prob,
-					"out"
+					"out",
+					is_train=self.is_training
 				)
 			self._nodule_seg_outs.append(out)
 			self._nodule_seg_weights.append((weights, bias))
@@ -176,6 +184,7 @@ class MultiHeadUnet_2D:
 		print("Creating loss of Nodule Segmentation...")
 		self._nodule_padded = tf.image.resize_images(self._nodule, 
 			[self.Y_nodule.get_shape()[1].value, self.Y_nodule.get_shape()[2].value])
+		self._nodule_prediction = tf.sigmoid(self._nodule_padded)
 		logits_flattened = tf.reshape(self._nodule_padded, [-1, 1])
 		target_flattened = tf.reshape(self.Y_nodule, [-1, 1])
 		self._nodule_loss = tf.reduce_mean(
@@ -195,11 +204,12 @@ class MultiHeadUnet_2D:
 			self.config.decay_rate, 
 			staircase=True)
 
-		self._nodule_optimizer = tf.train.MomentumOptimizer(
-			self._nodule_lr, 
-			self.config.momentum).minimize(
-				self._nodule_loss,
-				global_step=self._nodule_gs)
+		with tf.control_dependencies(self._update_ops):
+			self._nodule_optimizer = tf.train.MomentumOptimizer(
+				self._nodule_lr, 
+				self.config.momentum).minimize(
+					self._nodule_loss,
+					global_step=self._nodule_gs)
 		print("Creating loss of Nodule Segmentation...")
 
 	def create_cancer_classification_head(self):
@@ -228,7 +238,8 @@ class MultiHeadUnet_2D:
 					conv_kernels[0],
 					conv_strides[0],
 					self.drop_prob,
-					name="classify_1"
+					name="classify_1",
+					is_train=self.is_training
 				)
 			self._cancer_weights.append((weights, bias))
 			self._cancer_outs.append(out)
@@ -241,7 +252,8 @@ class MultiHeadUnet_2D:
 					conv_kernels[1],
 					conv_strides[1],
 					self.drop_prob,
-					name="classify_2"
+					name="classify_2",
+					is_train=self.is_training
 				)
 			self._cancer_weights.append((weights, bias))
 			self._cancer_outs.append(out)
@@ -266,7 +278,8 @@ class MultiHeadUnet_2D:
 				in_shape, 
 				64, 
 				prob=self.drop_prob, 
-				name="classify_4")
+				name="classify_4",
+				is_train=self.is_training)
 
 			self._cancer_weights.append((weights, bias))
 			self._cancer_outs.append(out)
@@ -277,7 +290,8 @@ class MultiHeadUnet_2D:
 				64, 
 				64, 
 				prob=self.drop_prob, 
-				name="classify_5")
+				name="classify_5",
+				is_train=self.is_training)
 
 			self._cancer_weights.append((weights, bias))
 			self._cancer_outs.append(out)
@@ -287,7 +301,8 @@ class MultiHeadUnet_2D:
 				64, 
 				1, 
 				prob=self.drop_prob, 
-				name="classify_6_out")
+				name="classify_6_out",
+				is_train=self.is_training)
 
 			self._cancer_weights.append((weights, bias))
 			self._cancer_outs.append(out)
@@ -297,6 +312,7 @@ class MultiHeadUnet_2D:
 
 	def create_cancer_classification_loss(self):
 		print("Adding loss to Cacner Classification...")
+		self._cancer_pred = tf.sigmoid(self._cancer)
 		self._cancer_loss = tf.reduce_mean(
 				tf.nn.weighted_cross_entropy_with_logits(
 						targets=self.Y_cancer,
@@ -314,11 +330,12 @@ class MultiHeadUnet_2D:
 			self.config.decay_rate, 
 			staircase=True)
 
-		self._cancer_optimizer = tf.train.MomentumOptimizer(
-			self._cancer_lr, 
-			self.config.momentum).minimize(
-				self._cancer_loss,
-				global_step=self._cancer_gs)
+		with tf.control_dependencies(self._update_ops):
+			self._cancer_optimizer = tf.train.MomentumOptimizer(
+				self._cancer_lr, 
+				self.config.momentum).minimize(
+					self._cancer_loss,
+					global_step=self._cancer_gs)
 		print("Added loss to Cacner Classification!")
 
 	def create_inputs(self, image_size):
@@ -355,16 +372,20 @@ class MultiHeadUnet_2D:
 			name="is_cancer")
 
 		#Probability for dropout
-		self.drop_prob = tf.placeholder_with_default(input=1.0,
+		self.drop_prob = tf.placeholder_with_default(input=0.0,
 			shape=None,
 			name="dropout_probability")
 
 		print("Created input placeholders!")
 
 	def start(self, restore=False):
-		self._init = tf.global_variables_initializer()
 		self._sess = tf.Session()
+		self._init = tf.global_variables_initializer()
 		self._saver = tf.train.Saver()
+
+		self._summary = tf.summary.merge_all()
+		self._summary_writer = tf.summary.FileWriter(self.config.model_save_path, graph=self._sess.graph)
+		self._summary_writer.flush()
 
 		self._sess.run(self._init)
 
@@ -396,7 +417,7 @@ class MultiHeadUnet_2D:
 				X = np.expand_dims(X, axis=len(X.shape))
 				Y = np.expand_dims(Y, axis=len(Y.shape))
 				step += 1
-				_, l = self._sess.run([self._nodule_optimizer, self._nodule_loss],
+				l, _ = self._sess.run([self._nodule_loss, self._nodule_optimizer],
 					feed_dict={
 						self.X: X,
 						self.Y_nodule: Y,
@@ -426,7 +447,7 @@ class MultiHeadUnet_2D:
 						self.is_training: False,
 						self.is_nodule: True,
 						self.is_cancer: False,
-						self.drop_prob: 1.0
+						self.drop_prob: 0.0
 					})
 				print("Batch Validation Loss: {}".format(l[0]))
 				loss += l[0]
@@ -443,7 +464,7 @@ class MultiHeadUnet_2D:
 				self.is_training: False,
 				self.is_nodule: True,
 				self.is_cancer: False,
-				self.drop_prob: 1.0
+				self.drop_prob: 0.0
 			})
 
 		return Y_inferred[0]
@@ -463,7 +484,7 @@ class MultiHeadUnet_2D:
 				X = np.expand_dims(X, axis=len(X.shape))
 				Y = np.expand_dims(Y, axis=len(Y.shape))
 				step += 1
-				_, l = self._sess.run([self._cancer_optimizer, self._cancer_loss],
+				l, _ = self._sess.run([self._cancer_loss, self._cancer_optimizer],
 					feed_dict={
 						self.X: X,
 						self.Y_cancer: Y,
@@ -493,7 +514,7 @@ class MultiHeadUnet_2D:
 						self.is_training: False,
 						self.is_nodule: False,
 						self.is_cancer: True,
-						self.drop_prob: 1.0
+						self.drop_prob: 0.0
 					})
 				print("Batch Validation Loss: {}".format(l[0]))
 				loss += l[0]
@@ -510,7 +531,7 @@ class MultiHeadUnet_2D:
 							self.is_training: False,
 							self.is_nodule: False,
 							self.is_cancer: True,
-							self.drop_prob: 1.0
+							self.drop_prob: 0.0
 					})
 
 		return Y_inferred[0]

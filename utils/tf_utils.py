@@ -1,10 +1,10 @@
 import tensorflow as tf
 
-def conv_2d_drop_bn_relu(inp, inp_chan, out_chan, kernel, stride=1, prob=1.0, name=""):
+def conv_2d_drop_bn_relu(inp, inp_chan, out_chan, kernel, stride=1, prob=1.0, name="", is_train=True):
 	weights = tf.Variable(tf.truncated_normal(
 			shape=[kernel, kernel, inp_chan, out_chan],
 			mean=0.0,
-			stddev=1.0),
+			stddev=0.3),
 		name=name+"_weights")
 	bias = tf.Variable(tf.constant(
 			shape=[out_chan],
@@ -16,7 +16,7 @@ def conv_2d_drop_bn_relu(inp, inp_chan, out_chan, kernel, stride=1, prob=1.0, na
 		padding='VALID',
 		name=name+"_conv")
 	drop = tf.nn.dropout(conv, prob, name=name+"_drop")
-	out = tf.nn.relu(tf.contrib.layers.batch_norm(drop + bias))
+	out = tf.nn.relu(tf.contrib.layers.batch_norm(drop + bias, is_training=is_train))
 
 	return out, weights, bias
 
@@ -29,11 +29,11 @@ def pool_2d(inp, kernel, stride, name=""):
 		name=name+"_pool")
 	return out
 
-def fc_drop_bn_relu(inp, inp_size, out_size, prob=1.0, name=""):
+def fc_drop_bn_relu(inp, inp_size, out_size, prob=1.0, name="", is_train=True):
 	weights = tf.Variable(tf.truncated_normal(
 			shape=[inp_size, out_size],
 			mean=0.0,
-			stddev=1.0),
+			stddev=0.3),
 		name=name+"_weights")
 	bias = tf.Variable(tf.constant(
 			shape=[out_size],
@@ -44,15 +44,15 @@ def fc_drop_bn_relu(inp, inp_size, out_size, prob=1.0, name=""):
 			tf.contrib.layers.batch_norm(
 				tf.nn.dropout(
 					tf.matmul(inp, weights) + bias,
-					prob, name=name+"_drop")))
+					prob, name=name+"_drop"), is_training=is_train))
 
 	return out, weights, bias
 
-def deconv_2d_drop_bn_relu(inp, inp_chan, out_chan, kernel, stride=1, prob=1.0, name=""):
+def deconv_2d_drop_bn_relu(inp, inp_chan, out_chan, kernel, stride=1, prob=1.0, name="", is_train=True):
 	weights = tf.Variable(tf.truncated_normal(
 			shape=[kernel, kernel, out_chan, inp_chan],
 			mean=0.0,
-			stddev=1.0),
+			stddev=0.3),
 		name=name+"_weights")
 	bias = tf.Variable(tf.constant(
 			shape=[out_chan],
@@ -69,7 +69,7 @@ def deconv_2d_drop_bn_relu(inp, inp_chan, out_chan, kernel, stride=1, prob=1.0, 
 		name=name+"_deconv")
 
 	drop = tf.nn.dropout(deconv, prob, name=name+"_drop")
-	out = tf.nn.relu(tf.contrib.layers.batch_norm(drop + bias))
+	out = tf.nn.relu(tf.contrib.layers.batch_norm(drop + bias, is_training=is_train))
 
 	return out, weights, bias
 

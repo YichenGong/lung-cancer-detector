@@ -5,14 +5,13 @@ import options
 import models.aggressive_multi_head_UNET_2d as unet
 import numpy as np
 
-from dataloader import lidc, luna, sample, stage1
-
 opt = options.parse()
 print(opt)
 
 net = unet.get_model(opt)
 net.start(restore=True)
 if (not opt.amhu2_luna_lidc_train) and opt.amhu2_luna_train:
+	from dataloader import luna
 	opt.original = True
 	dl_luna = luna.get_data_loader(opt)
 
@@ -21,6 +20,7 @@ if (not opt.amhu2_luna_lidc_train) and opt.amhu2_luna_train:
 		opt.false_negative_weight)
 
 if (not opt.amhu2_luna_lidc_train) and opt.amhu2_lidc_train:
+	from dataloader import lidc
 	opt.original = True
 	dl_lidc = lidc.get_data_loader(opt)
 
@@ -29,6 +29,7 @@ if (not opt.amhu2_luna_lidc_train) and opt.amhu2_lidc_train:
 		opt.false_negative_weight)
 
 if opt.amhu2_luna_lidc_train:
+	from dataloader import lidc, luna
 	opt.original = True
 	class DataMixer:
 		def __init__(self):
@@ -74,6 +75,7 @@ if opt.amhu2_luna_lidc_train:
 		opt.false_negative_weight)
 
 if opt.amhu2_nodule_cancer_train:
+	from dataloader import lidc
 	class NoduleCancerLayers:
 		def __init__(self, dl, opt):
 			self.dl = dl.get_data_loader(opt)
@@ -132,6 +134,7 @@ class KaggleSingleLayer:
 		self.dl.test()
 
 if opt.amhu2_sample_train:
+	from dataloader import sample
 	opt.original = True
 	dl_sample = KaggleSingleLayer(sample, opt)
 
@@ -140,6 +143,7 @@ if opt.amhu2_sample_train:
 		opt.false_negative_weight)
 
 if opt.amhu2_stage1_train:
+	from dataloader import stage1
 	opt.original = True
 	dl_stage1 = KaggleSingleLayer(stage1, opt)
 
