@@ -44,6 +44,9 @@ def shear_2d(img, dxdy, random_mode=True, probability=0.5):
 	shear_mat = np.array([[1, dx, 0], [dy, 1, 0]])
 	return apply_affine(img, shear_mat)
 
+def apply_elastic(img, indices):
+	return nd.map_coordinates(img, indices, order=1).reshape(img.shape)
+
 def elastic_transform_2d(img, alpha, sigma, random_mode=True, probability=0.5):
 	#Taken from: https://gist.github.com/chsasank/4d8f68caf01f041a6453e67fb30f8f5a
 	if random_mode:
@@ -56,25 +59,68 @@ def elastic_transform_2d(img, alpha, sigma, random_mode=True, probability=0.5):
 	x, y = np.meshgrid(np.arange(img.shape[0]), np.arange(img.shape[1]), indexing='ij')
 	indices = np.reshape(x+dx, (-1, 1)), np.reshape(y+dy, (-1, 1))
 
-	return nd.map_coordinates(img, indices, order=1).reshape(img.shape)
+	return apply_elastic(img, indices), indices
 
-def resize_2d(img, new_size):
-	return cv.resize(img, new_size)
+def resize_2d(img, new_size, padding=False):
+	if padding:
+		if new_size[0] < img.shape[0]:
+			start_x = (img.shape[0] - new_size[0])//2
+			end_x = -start_x
+		else:
+			start_x = 0
+			end_x = img.shape[0]
+		if new_size[1] < img.shape[1]:
+			start_y = (img.shape[1] - new_size[1])//2
+			end_y = -start_y
+		else:
+			start_y = 0
+			end_y = img.shape[1]
+		img_reshaped = img[start_x:end_x, start_y:end_y]
 
-def resize_3d(img, new_size):
-	if new_size[0] == -1:
-		#Resize 2D wise!
-		if new_size[1] != img[0].shape[0] and new_size[2] != img[0].shape[1]:
-			return np.array([cv.resize(img[idx], (new_size[1], new_size[2])) \
-				for idx in range(img.shape[0])])
+		padd_x_left = padd_x_right = padd_y_left = padd_y_right = 0
+		if new_size[0] > img_reshaped.shape[0]:
+			padd_x_left = (new_size[0] - img_reshaped.shape[0]) // 2
+			padd_x_right = (new_size[0] - img_reshaped.shape[0] + 1) // 2
+		if new_size[1] > img_reshaped.shape[1]:
+			padd_y_left = (new_size[1] - img_reshaped.shape[1]) // 2
+			padd_y_right = (new_size[1] - img_reshaped.shape[1] + 1) // 2
+
+		return np.pad(img_reshaped, 
+			((padd_x_left, padd_x_right), (padd_y_left, padd_y_right)), 
+			'constant', constant_values=(0))
+	else:
+		if new_size[0] != img.shape[0] and new_size[1] != img.shape[1]:
+			return cv.resize(img, new_size)
 		else:
 			return img
+
+def resize_3d(img, new_size, padding=False):
+	if new_size[0] == -1:
+		return np.array([resize_2d(img[idx], (new_size[1], new_size[2]), padding) \
+				for idx in range(img.shape[0])])
 	else:
-		resize_factor = [a/float(b) for a,b in zip(new_size, img.shape)]
-		if resize_factor == (1.0, 1.0, 1.0):
-			return img
-			
-		return nd.interpolation.zoom(img, resize_factor, mode='nearest')
+		if padding:
+			if new_size[0] == img.shape[0]:
+				return img
+			#Only pads/crops on the Z-Direction
+			if new_size[0] > img.shape[0]:
+				padd_z_left = (new_size[0] - img.shape[0]) // 2
+				padd_z_right = (new_size[0] - img.shape[0] + 1) // 2
+
+				return np.pad(img, 
+					((padd_z_left, padd_z_right), (0, 0), (0,0)),
+					'constant', constant_values=(0))
+			else:
+				offset_z = (img.shape[0] - new_size[0])//2
+
+				return img[offset_z:(-offset_z), :, :]
+		else:
+			resize_factor = [a/float(b) for a,b in zip(new_size, img.shape)]
+			if resize_factor == (1.0, 1.0, 1.0):
+				return img
+				
+			return nd.interpolation.zoom(img, resize_factor, mode='nearest')
+
 
 def apply_affine(img, mat):
 	return cv.warpAffine(img, mat, img.shape, flags=cv.INTER_LINEAR)

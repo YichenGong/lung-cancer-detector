@@ -33,6 +33,7 @@ class Luna16(BaseDataLoader):
 		while self._current_pointer < self._current_set_size:
 			img, o, s = p.load(open(os.path.join(self._target_directory, 
 				self._X[self._current_pointer] + ".pick"), "rb"))
+			img = dp.normalize_planes(img)
 			
 			for sliceIdx in range(img.shape[0]):
 				batch_X.append(img[sliceIdx])
@@ -41,14 +42,20 @@ class Luna16(BaseDataLoader):
 				count += 1
 
 				if count % self._batch_size == 0:
-					yield np.array(batch_X), np.array(batch_Y)
+					Y = np.array(batch_Y)
+					Y[Y > 0] = 1
+					Y[Y <= 0] = 0
+					yield np.array(batch_X), Y
 					count = 0
 					batch_X, batch_Y = [], []
 
 			self._current_pointer += 1
 
 		if len(batch_X) > 0:
-			yield np.array(batch_X), np.array(batch_Y)
+			Y = np.array(batch_Y)
+			Y[Y > 0] = 1
+			Y[Y <= 0] = 0
+			yield np.array(batch_X), Y
 
 	def train(self, do_shuffle=True):
 		if do_shuffle:

@@ -15,8 +15,8 @@ class Stage1Kaggle(BaseDataLoader):
 	def _load_sets(self):
 		print("Loading datasets")
 
-		train_patients = pd.read_csv(self._directory + "stage1_labels.csv")
-		test_patients = pd.read_csv(self._directory + "stage1_sample_submission.csv")
+		train_patients = pd.read_csv(os.path.join(self._directory, "stage1_labels.csv"))
+		test_patients = pd.read_csv(os.path.join(self._directory, "stage1_sample_submission.csv"))
 
 		for idx, row in test_patients.iterrows():
 			self._test_set.append(row['id'])
@@ -61,18 +61,18 @@ class Stage1Kaggle(BaseDataLoader):
 		for idx, patient in enumerate(self._train_set):
 			print("Pre-processing patient: ", patient[0], str(idx+1) + "/" + str(size))
 			if self._original_size:
-				image = dp.get_image_HU(os.path.join(self._directory + patient[0]))
+				image = dp.get_image_HU(os.path.join(self._directory, patient[0]))
 			else:
-				image = dp.get_resized(os.path.join(self._directory + patient[0]), self._size)
+				image = dp.get_resized(os.path.join(self._directory, patient[0]), self._size)
 			p.dump(image, open(os.path.join(self._target_directory, patient[0] + ".pick"), "wb"), protocol=2)
 
 		size = len(self._test_set)
 		for idx, patient in enumerate(self._test_set):
 			print("Pre-processing patient: ", patient, str(idx+1) + "/" + str(size))
 			if self._original_size:
-				image = dp.get_image_HU(os.path.join(self._directory + patient))
+				image = dp.get_image_HU(os.path.join(self._directory, patient))
 			else:
-				image = dp.get_resized(os.path.join(self._directory + patient), self._size)
+				image = dp.get_resized(os.path.join(self._directory, patient), self._size)
 			p.dump(image, open(os.path.join(self._target_directory, patient + ".pick"), "wb"), protocol=2)
 
 		print("Pre-processing: Done!")
@@ -101,7 +101,9 @@ class Stage1Kaggle(BaseDataLoader):
 		self._current_set_y = [0] * self._current_set_size
 
 	def _load_patient(self, patient):
-		return p.load(open(os.path.join(self._target_directory, patient + ".pick"), "rb"))
+		img = p.load(open(os.path.join(self._target_directory, patient + ".pick"), "rb"))
+		img = dp.normalize_planes(img)
+		return img
 
 	def data_iter(self):
 		self._current_pointer = 0
