@@ -10,6 +10,10 @@ import scipy.ndimage as nd
 import utils.dicom_processor as dp
 from dataloader.base_dataloader import BaseDataLoader
 
+TRAIN = 'train'
+VALID = 'valid'
+TEST = 'test'
+
 
 class CandidateDataLoader(BaseDataLoader):
   def __init__(self, config):
@@ -33,6 +37,8 @@ class CandidateDataLoader(BaseDataLoader):
     # self.train_ids, self.valid_ids, self.test_ids  = self.get_ids_from_sample_dataset()
     self.current_ids = self.train_ids
     self.current_pointer = 0
+    self.current_set = None
+    self.random_for_negative_samples = True
 
     self.data = self.build_data_dict(layer_features=['67', '77'], k=self.k)
 
@@ -43,7 +49,7 @@ class CandidateDataLoader(BaseDataLoader):
 
     while self.current_pointer < current_set_size:
       batch_ids = self.current_ids[self.current_pointer: self.current_pointer + self.batch_size]
-      batch_x = np.array([self.get_first_k_patches(id, self.k, self.diameter_mm, self.resize_to)
+      batch_x = np.array([self.get_first_k_patches(id, self.k, self.diameter_mm, self.resize_to, self.data[id]['label'])
                           for id in batch_ids])
       batch_x = np.swapaxes(batch_x,0,1)
       batch_y = np.array([self.data[id]['label'] for id in batch_ids])
@@ -53,43 +59,55 @@ class CandidateDataLoader(BaseDataLoader):
 
 
   def train(self, do_shuffle=True):
+    self.current_set = TRAIN
     self.current_ids = self.train_ids
+    self.shuffle()
     self.reset()
 
   def validate(self):
+    self.current_set = VALID
     self.current_ids = self.valid_ids
     self.reset()
 
   def test(self):
+    self.current_set = TEST
     self.current_ids = self.test_ids
     self.reset()
 
   def shuffle(self):
-    # Shuffle the dataset
-    pass
+    random.shuffle(self.current_ids)
 
   def reset(self):
     self.current_pointer = 0
 
 
-  def get_first_k_patches(self, pid, k, diameter_mm, resize_to, reuse=True):
+  def get_first_k_patches(self, pid, k, diameter_mm, resize_to, label, reuse=True):
     """
       Gets first k patches and resize them into unified size.
     """
     file_path = '{}/{}.pkl'.format(self.patch_dir, pid)
+    use_random_locs = self.current_set == TRAIN and self.random_for_negative_samples and label == 0
 
-    if reuse and os.path.exists(file_path):
+    if reuse and not use_random_locs and os.path.exists(file_path):
       with open(file_path, 'rb') as f:
         try:
           result = pickle.load(f)
         except EOFError:
           print('EOF Error: file id: {}'.format(pid))
+
     else:
       d = self.data[pid]
       scan = dp.get_image_HU('{}{}'.format(self.stage1_dir, pid))
       result = []
       for i in range(k):
-        raw_patch = get_patch(scan, d[i]['loc'], diameter_mm, d['spacing'])
+        if use_random_locs:
+          loc = [np.random.randint(scan.shape[1]),
+                 np.random.randint(scan.shape[2]),
+                 np.random.randint(scan.shape[0])]
+        else:
+          loc = d[i]['loc']
+
+        raw_patch = get_patch(scan, loc, diameter_mm, d['spacing'])
         resize_factor = [resize_to / float(patch_shape) for patch_shape in raw_patch.shape]
         patch = nd.interpolation.zoom(raw_patch, resize_factor, mode='nearest')
         result.append(patch)
