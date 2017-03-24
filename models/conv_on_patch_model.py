@@ -45,19 +45,17 @@ def conv_bn_relu(input, kernel_shape, stride, bias_shape, is_training):
   weights = tf.get_variable("weights", kernel_shape, initializer=tf.random_normal_initializer(stddev=0.3))
   biases = tf.get_variable("biases", bias_shape, initializer=tf.constant_initializer(0.0))
 
-  # print(input.get_shape())
-  conv = tf.nn.conv3d(input, weights, strides=stride, padding='VALID')
-  batch_norm = tf.contrib.layers.batch_norm(conv + biases, is_training=is_training)
+  conv = tf.nn.conv3d(input, weights, strides=stride, padding='SAME') + biases
+  batch_norm = tf.contrib.layers.batch_norm(conv, is_training=is_training)
   relu = tf.nn.relu(batch_norm)
   return relu
 
 def fc_bn_relu(input, weight_shape, bias_shape, is_training=False):
-  # print(weight_shape)
   weights = tf.get_variable("weights", weight_shape, initializer=tf.random_normal_initializer(stddev=0.3))
   biases = tf.get_variable("biases", bias_shape, initializer=tf.constant_initializer(0.0))
 
-  hidden = tf.matmul(input, weights)
-  batch_norm = tf.contrib.layers.batch_norm(hidden + biases, is_training=is_training)
+  hidden = tf.matmul(input, weights) + biases
+  batch_norm = tf.contrib.layers.batch_norm(hidden, is_training=is_training)
   relu = tf.nn.relu(batch_norm)
   return relu
 

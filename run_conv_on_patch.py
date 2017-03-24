@@ -9,13 +9,13 @@ import importlib
 from dataloader.candidates import CandidateDataLoader
 from models.conv_on_patch_model import ConvOnPatches
 log_dir = "oldLogs/"
-model_dir = "conv-3/"
+model_dir = "conv-6/"
 if not os.path.exists(log_dir + model_dir):
 	os.makedirs(os.path.dirname(log_dir + model_dir))
 
 opt = options.parse()
 ## args for loader
-opt.top_k = 3
+opt.top_k = 5
 opt.diameter_mm = 30
 
 #######################################################
@@ -23,8 +23,8 @@ opt.diameter_mm = 30
 #######################################################
 with tf.device('/gpu:0'):
   chan = [1,32,64,64,128,128,256,256]
-  kernel = [5,5,3,3,3,3,3]
-  stride = [1,2,1,1,1,1,1]
+  kernel = [5,5,3,3,5,3,3]
+  stride = [1,2,1,1,2,1,1]
   num_hidden = 64
   num_labels = 1
   num_nodules = opt.top_k
