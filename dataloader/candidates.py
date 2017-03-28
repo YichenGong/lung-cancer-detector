@@ -49,7 +49,7 @@ class CandidateDataLoader(BaseDataLoader):
 
     while self.current_pointer < current_set_size:
       batch_ids = self.current_ids[self.current_pointer: self.current_pointer + self.batch_size]
-      batch_x = np.array([self.get_first_k_patches(id, self.k, self.diameter_mm, self.resize_to, self.data[id]['label'])
+      batch_x = np.array([self.get_k_patches(id, self.k, self.diameter_mm, self.resize_to, self.data[id]['label'])
                           for id in batch_ids])
       batch_x = np.swapaxes(batch_x,0,1)
       batch_y = np.array([self.data[id]['label'] for id in batch_ids])
@@ -81,14 +81,14 @@ class CandidateDataLoader(BaseDataLoader):
     self.current_pointer = 0
 
 
-  def get_first_k_patches(self, pid, k, diameter_mm, resize_to, label, reuse=True):
+  def get_k_patches(self, pid, k, diameter_mm, resize_to, label, reuse=True):
     """
       Gets first k patches and resize them into unified size.
     """
     file_path = '{}/{}.pkl'.format(self.patch_dir, pid)
     use_random_locs = self.current_set == TRAIN and self.random_for_negative_samples and label == 0
 
-    if reuse and not use_random_locs and os.path.exists(file_path):
+    if reuse and os.path.exists(file_path):
       with open(file_path, 'rb') as f:
         try:
           result = pickle.load(f)
@@ -99,20 +99,29 @@ class CandidateDataLoader(BaseDataLoader):
       d = self.data[pid]
       scan = dp.get_image_HU('{}{}'.format(self.stage1_dir, pid))
       result = []
-      for i in range(k):
-        if use_random_locs:
-          loc = [np.random.randint(scan.shape[1]),
-                 np.random.randint(scan.shape[2]),
-                 np.random.randint(scan.shape[0])]
-        else:
-          loc = d[i]['loc']
+      # original locations
+      locs = [d[i]['loc'] for i in range(k)]
 
+      # random locations for training data
+      if use_random_locs:
+        for i in range(25):
+          locs.append([np.random.randint(scan.shape[1]),
+                       np.random.randint(scan.shape[2]),
+                       np.random.randint(scan.shape[0])])
+
+      for loc in locs:
         raw_patch = get_patch(scan, loc, diameter_mm, d['spacing'])
         resize_factor = [resize_to / float(patch_shape) for patch_shape in raw_patch.shape]
         patch = nd.interpolation.zoom(raw_patch, resize_factor, mode='nearest')
         result.append(patch)
+
       with open(file_path, 'wb') as f:
         pickle.dump(result, f)
+
+    # for reuse case load random 5 out of 30
+    if use_random_locs:
+      result = random.sample(result, k)
+
     return result
 
   def split_dataset(self):
