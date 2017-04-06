@@ -28,7 +28,7 @@ def worldToVoxelCoord(worldCoord, origin, spacing):
 
 def get_patch(scan, loc, diameter_mm, spacing):
   # spacing mm/pixel
-  spacing_z, spacing_x, spacing_y = spacing
+  spacing_x, spacing_y, spacing_z = spacing
 
   # the units of radius below is pixel
   radius_x = int(diameter_mm / spacing_x / 2)
@@ -36,11 +36,11 @@ def get_patch(scan, loc, diameter_mm, spacing):
   radius_z = int(diameter_mm / spacing_z / 2)
 
   x,y,z = loc
-  z_lo, z_hi = get_lo_hi_within_bound(z, radius_z, scan.shape[0])
-  x_lo, x_hi = get_lo_hi_within_bound(x, radius_x, scan.shape[1])
-  y_lo, y_hi = get_lo_hi_within_bound(y, radius_y, scan.shape[2])
+  x_lo, x_hi = get_lo_hi_within_bound(x, radius_x, scan.shape[0])
+  y_lo, y_hi = get_lo_hi_within_bound(y, radius_y, scan.shape[1])
+  z_lo, z_hi = get_lo_hi_within_bound(y, radius_y, scan.shape[2])
 
-  return scan[z_lo:z_hi, x_lo:x_hi, y_lo:y_hi]
+  return scan[x_lo:x_hi, y_lo:y_hi,z_lo:z_hi]
 
 
 def get_lo_hi_within_bound(center, radius, upper_bound, lower_bound=0):
@@ -84,10 +84,11 @@ def build_data_dict(path):
 
 
 def extract_patches(img_dir, data_dict, patch_dir, diameter_mm):
-  for uid, locs in data_dict:
+  for uid, locs in data_dict.items():
     scan, origin, spacing = load_itk(img_dir + uid + '.mhd')
     for loc_world_coord in locs:
       loc = worldToVoxelCoord(loc_world_coord, origin, spacing)
+      loc = [int(i) for i in loc]
       # get and preprocess patch
       raw_patch = get_patch(scan, loc, diameter_mm, spacing)
       resize_factor = [diameter_mm / float(patch_shape) for patch_shape in raw_patch.shape]
@@ -99,12 +100,12 @@ def extract_patches(img_dir, data_dict, patch_dir, diameter_mm):
       with open(file_path, 'wb') as f:
         pickle.dump(patch, f)
 
-      if current_id % 100 == 0:
+      if current_id % 1 == 0:
         print(current_id)
 
 
 data_dir = 'data/luna16/'
-img_dir = data_dir + '/image/'
+img_dir = data_dir + 'images/'
 
 annotations = build_data_dict(data_dir + '/CSVFILES/annotations.csv')
 candidates  = build_data_dict(data_dir + '/CSVFILES/candidates.csv')
